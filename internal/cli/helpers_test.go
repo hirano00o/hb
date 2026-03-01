@@ -205,3 +205,123 @@ func TestConfirmAction_EOF(t *testing.T) {
 		t.Error("expected false on EOF")
 	}
 }
+
+// TestResolveConflict_NoExist verifies that a non-existent path is returned as-is.
+func TestResolveConflict_NoExist(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader(""))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, filepath.Join(t.TempDir(), "nonexistent.md"), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip for non-existent file")
+	}
+	if !strings.HasSuffix(dest, "nonexistent.md") {
+		t.Errorf("expected original path, got %s", dest)
+	}
+}
+
+// TestResolveConflict_Skip verifies that 's' input causes a skip.
+func TestResolveConflict_Skip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("s\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	_, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !skip {
+		t.Error("expected skip for 's' input")
+	}
+}
+
+// TestResolveConflict_CustomName verifies that a user-provided name is used.
+func TestResolveConflict_CustomName(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("renamed.md\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip")
+	}
+	if !strings.HasSuffix(dest, "renamed.md") {
+		t.Errorf("expected renamed.md, got %s", dest)
+	}
+}
+
+// TestResolveConflict_AutoRename verifies that empty input triggers auto-rename.
+func TestResolveConflict_AutoRename(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip")
+	}
+	if dest == path {
+		t.Error("expected auto-renamed path, got original")
+	}
+	if !strings.HasSuffix(dest, ".md") {
+		t.Errorf("expected .md extension, got %s", dest)
+	}
+}
+
+// TestResolveConflict_Force verifies that --force triggers auto-rename without prompting.
+func TestResolveConflict_Force(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	// no input; force should not read from stdin
+	cmd.SetIn(strings.NewReader(""))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip for force")
+	}
+	if dest == path {
+		t.Error("expected auto-renamed path, got original")
+	}
+}
