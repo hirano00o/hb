@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // Client is a Hatena Blog AtomPub API client.
@@ -23,7 +24,7 @@ func NewClient(hatenaID, blogID, apiKey string) *Client {
 		blogID:   blogID,
 		apiKey:   apiKey,
 		baseURL:  "https://blog.hatena.ne.jp",
-		http:     &http.Client{},
+		http:     &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -56,6 +57,9 @@ func (c *Client) do(method, url string, body []byte) (*http.Response, error) {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return nil, fmt.Errorf("http %s %s: %w", method, url, err)
 	}
 	return resp, nil

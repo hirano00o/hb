@@ -18,8 +18,14 @@ func newTestClient(t *testing.T, mux *http.ServeMux) *Client {
 }
 
 func TestListEntries_Pagination(t *testing.T) {
-	page1, _ := os.ReadFile("testdata/feed_page1.xml")
-	page2, _ := os.ReadFile("testdata/feed_page2.xml")
+	page1, err := os.ReadFile("testdata/feed_page1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page2, err := os.ReadFile("testdata/feed_page2.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +55,10 @@ func TestListEntries_Pagination(t *testing.T) {
 }
 
 func TestGetEntry_OK(t *testing.T) {
-	data, _ := os.ReadFile("testdata/entry_single.xml")
+	data, err := os.ReadFile("testdata/entry_single.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/123456789", func(w http.ResponseWriter, r *http.Request) {
 		w.Write(data)
@@ -89,7 +98,10 @@ func TestGetEntry_Unauthorized(t *testing.T) {
 }
 
 func TestCreateEntry_OK(t *testing.T) {
-	respData, _ := os.ReadFile("testdata/entry_single.xml")
+	respData, err := os.ReadFile("testdata/entry_single.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -111,7 +123,10 @@ func TestCreateEntry_OK(t *testing.T) {
 }
 
 func TestUpdateEntry_OK(t *testing.T) {
-	respData, _ := os.ReadFile("testdata/entry_single.xml")
+	respData, err := os.ReadFile("testdata/entry_single.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/123456789", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {

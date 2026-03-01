@@ -123,3 +123,98 @@ func TestGlobalConfigPath_XDG(t *testing.T) {
 		t.Errorf("want %s, got %s", want, path)
 	}
 }
+
+func TestLoadMerged_GlobalOnly(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	globalDir := filepath.Join(dir, "hb")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "config.yaml"),
+		[]byte("hatena_id: guser\nblog_id: gblog\napi_key: gkey\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Change to a directory without a project config.
+	t.Chdir(t.TempDir())
+
+	cfg, err := config.LoadMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.HatenaID != "guser" || cfg.BlogID != "gblog" || cfg.APIKey != "gkey" {
+		t.Errorf("got %+v", cfg)
+	}
+}
+
+func TestLoadMerged_BothExist(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	globalDir := filepath.Join(dir, "hb")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "config.yaml"),
+		[]byte("hatena_id: guser\nblog_id: gblog\napi_key: gkey\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Create a project directory with a project config that overrides blog_id.
+	projectDir := t.TempDir()
+	hbDir := filepath.Join(projectDir, ".hb")
+	if err := os.MkdirAll(hbDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hbDir, "config.yaml"),
+		[]byte("blog_id: pblog\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(projectDir)
+
+	cfg, err := config.LoadMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.HatenaID != "guser" {
+		t.Errorf("HatenaID should be global, got %s", cfg.HatenaID)
+	}
+	if cfg.BlogID != "pblog" {
+		t.Errorf("BlogID should be overridden by project, got %s", cfg.BlogID)
+	}
+	if cfg.APIKey != "gkey" {
+		t.Errorf("APIKey should be global, got %s", cfg.APIKey)
+	}
+}
+
+func TestProjectConfigPath_Found(t *testing.T) {
+	root := t.TempDir()
+	hbDir := filepath.Join(root, ".hb")
+	if err := os.MkdirAll(hbDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hbDir, "config.yaml"), []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Change to a child directory — ProjectConfigPath should walk up to find .hb/config.yaml.
+	child := filepath.Join(root, "sub", "child")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(child)
+
+	got, err := config.ProjectConfigPath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(root, ".hb", "config.yaml")
+	if got != want {
+		t.Errorf("want %s, got %s", want, got)
+	}
+}
+
+func TestProjectConfigPath_NotFound(t *testing.T) {
+	t.Chdir(t.TempDir())
+	_, err := config.ProjectConfigPath()
+	if err == nil {
+		t.Fatal("expected error when project config not found")
+	}
+}

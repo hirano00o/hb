@@ -43,7 +43,10 @@ func newFetchCmd() *cobra.Command {
 			}
 
 			remoteArticle := article.FromEntry(remote)
-			diff := unifiedDiff(path, local, remoteArticle)
+			diff, err := unifiedDiff(path, local, remoteArticle)
+			if err != nil {
+				return err
+			}
 			if diff == "" {
 				fmt.Fprintln(cmd.OutOrStdout(), "No changes.")
 				return nil
@@ -53,7 +56,7 @@ func newFetchCmd() *cobra.Command {
 
 			scanner := bufio.NewScanner(cmd.InOrStdin())
 			if !scanner.Scan() {
-				return nil
+				return scanner.Err()
 			}
 			if !strings.EqualFold(strings.TrimSpace(scanner.Text()), "y") {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
@@ -87,10 +90,10 @@ func globMD(root string) ([]string, error) {
 }
 
 // articleToString renders an Article to its file content string for diffing.
-func articleToString(a *article.Article) string {
+func articleToString(a *article.Article) (string, error) {
 	header, err := article.RenderFrontmatter(&a.Frontmatter)
 	if err != nil {
-		return a.Body
+		return "", fmt.Errorf("render frontmatter: %w", err)
 	}
-	return header + a.Body
+	return header + a.Body, nil
 }

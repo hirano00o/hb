@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/hirano00o/hb/article"
@@ -35,7 +36,7 @@ func newPullCmd() *cobra.Command {
 			// Build a set of known editUrls from local files to skip already-fetched entries.
 			knownEditURLs := map[string]struct{}{}
 			if !force {
-				knownEditURLs, err = collectLocalEditURLs(dir)
+				knownEditURLs, err = collectLocalEditURLs(dir, cmd.ErrOrStderr())
 				if err != nil {
 					return err
 				}
@@ -68,8 +69,8 @@ func newPullCmd() *cobra.Command {
 }
 
 // collectLocalEditURLs walks the given directory recursively and collects all editUrl values
-// found in frontmatter of .md files.
-func collectLocalEditURLs(dir string) (map[string]struct{}, error) {
+// found in frontmatter of .md files. Unreadable files are skipped with a warning to w.
+func collectLocalEditURLs(dir string, w io.Writer) (map[string]struct{}, error) {
 	known := map[string]struct{}{}
 	files, err := globMD(dir)
 	if err != nil {
@@ -78,7 +79,8 @@ func collectLocalEditURLs(dir string) (map[string]struct{}, error) {
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
-			continue // skip unreadable files
+			fmt.Fprintf(w, "warning: skipping %s: %v\n", f, err)
+			continue
 		}
 		if a.Frontmatter.EditURL != "" {
 			known[a.Frontmatter.EditURL] = struct{}{}

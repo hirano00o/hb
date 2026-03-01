@@ -20,7 +20,7 @@ func newInitCmd() *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "%s already exists. Overwrite? [y/N]: ", projectConfigFile)
 				scanner := bufio.NewScanner(cmd.InOrStdin())
 				if !scanner.Scan() {
-					return nil
+					return scanner.Err()
 				}
 				if !strings.EqualFold(strings.TrimSpace(scanner.Text()), "y") {
 					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")

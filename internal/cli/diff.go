@@ -40,7 +40,10 @@ func newDiffCmd() *cobra.Command {
 				return err
 			}
 			remoteArticle := article.FromEntry(remote)
-			diff := unifiedDiff(path, local, remoteArticle)
+			diff, err := unifiedDiff(path, local, remoteArticle)
+			if err != nil {
+				return err
+			}
 			if diff == "" {
 				fmt.Fprintln(cmd.OutOrStdout(), "No differences.")
 				return nil
@@ -52,9 +55,15 @@ func newDiffCmd() *cobra.Command {
 }
 
 // unifiedDiff returns a unified diff string comparing local to remote article content.
-func unifiedDiff(path string, local, remote *article.Article) string {
-	localStr := articleToString(local)
-	remoteStr := articleToString(remote)
+func unifiedDiff(path string, local, remote *article.Article) (string, error) {
+	localStr, err := articleToString(local)
+	if err != nil {
+		return "", err
+	}
+	remoteStr, err := articleToString(remote)
+	if err != nil {
+		return "", err
+	}
 	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
 		A:        difflib.SplitLines(localStr),
 		B:        difflib.SplitLines(remoteStr),
@@ -63,7 +72,7 @@ func unifiedDiff(path string, local, remote *article.Article) string {
 		Context:  3,
 	})
 	if err != nil {
-		return "diff generation failed"
+		return "", fmt.Errorf("diff generation: %w", err)
 	}
-	return diff
+	return diff, nil
 }
