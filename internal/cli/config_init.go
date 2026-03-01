@@ -76,21 +76,46 @@ func promptConfig(cmd *cobra.Command, hatenaID, blogID string) (*config.Config, 
 	return cfg, nil
 }
 
-// readPassword reads a password from the terminal with masking if stdin is a terminal,
-// or falls back to plain text reading via scanner when stdin is not a terminal (e.g. pipe).
+// readPassword reads a password from stdin.
+// When stdin is a terminal, it switches to raw mode and echoes '*' for each character typed.
+// Backspace removes the last character, Ctrl+C returns an error.
+// Falls back to plain text reading via scanner when stdin is not a terminal (e.g. pipe).
 func readPassword(cmd *cobra.Command, scanner *bufio.Scanner) (string, error) {
 	// Try to get the file descriptor of stdin for terminal detection.
 	type fder interface{ Fd() uintptr }
 	if f, ok := cmd.InOrStdin().(fder); ok {
 		fd := int(f.Fd())
 		if term.IsTerminal(fd) {
-			raw, err := term.ReadPassword(fd)
+			oldState, err := term.MakeRaw(fd)
 			if err != nil {
 				return "", err
 			}
-			// term.ReadPassword does not print a newline.
-			fmt.Fprintln(cmd.OutOrStdout())
-			return string(raw), nil
+			defer term.Restore(fd, oldState) //nolint:errcheck
+
+			out := cmd.OutOrStdout()
+			var buf []byte
+			b := make([]byte, 1)
+			for {
+				if _, err := cmd.InOrStdin().Read(b); err != nil {
+					return "", err
+				}
+				switch b[0] {
+				case '\r', '\n':
+					fmt.Fprintln(out)
+					return string(buf), nil
+				case '\x7f', '\b': // Backspace
+					if len(buf) > 0 {
+						buf = buf[:len(buf)-1]
+						fmt.Fprint(out, "\b \b")
+					}
+				case '\x03': // Ctrl+C
+					fmt.Fprintln(out)
+					return "", fmt.Errorf("interrupted")
+				default:
+					buf = append(buf, b[0])
+					fmt.Fprint(out, "*")
+				}
+			}
 		}
 	}
 	// Non-terminal fallback: read via scanner (no masking).
