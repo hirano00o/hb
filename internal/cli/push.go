@@ -10,6 +10,8 @@ import (
 
 func newPushCmd() *cobra.Command {
 	var yes bool
+	var draft bool
+	var draftSet bool
 
 	cmd := &cobra.Command{
 		Use:   "push <file>",
@@ -26,6 +28,24 @@ func newPushCmd() *cobra.Command {
 			client, err := newClientFromConfig()
 			if err != nil {
 				return err
+			}
+
+			// Apply --draft override when the flag was explicitly set.
+			if draftSet && draft != local.Frontmatter.Draft {
+				ok, err := confirmAction(cmd, fmt.Sprintf(
+					"Frontmatter draft=%v but --draft=%v. Push as draft=%v? [y/N]: ",
+					local.Frontmatter.Draft, draft, draft,
+				))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+					return nil
+				}
+				local.Frontmatter.Draft = draft
+			} else if draftSet {
+				local.Frontmatter.Draft = draft
 			}
 
 			// No editUrl → new entry, POST
@@ -87,6 +107,12 @@ func newPushCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&draft, "draft", false, "Override entry draft status")
+	// Track whether --draft was explicitly specified on the command line.
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		draftSet = cmd.Flags().Changed("draft")
+		return nil
+	}
 	return cmd
 }
 
