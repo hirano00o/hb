@@ -19,6 +19,7 @@ func newPullCmd() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull all remote entries to local Markdown files",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			cfg, err := config.LoadMerged()
 			if err != nil {
 				return err
@@ -28,7 +29,7 @@ func newPullCmd() *cobra.Command {
 			}
 
 			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
-			entries, err := client.ListEntries()
+			entries, err := client.ListEntries(ctx)
 			if err != nil {
 				return err
 			}

@@ -2,6 +2,7 @@ package hatena
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,7 +38,7 @@ func (c *Client) collectionURL() string {
 	return fmt.Sprintf("%s/%s/%s/atom/entry", c.baseURL, c.hatenaID, c.blogID)
 }
 
-func (c *Client) do(method, url string, body []byte) (*http.Response, error) {
+func (c *Client) do(ctx context.Context, method, url string, body []byte) (*http.Response, error) {
 	wsseHeader, err := GenerateWSSEHeader(c.hatenaID, c.apiKey)
 	if err != nil {
 		return nil, err
@@ -46,7 +47,7 @@ func (c *Client) do(method, url string, body []byte) (*http.Response, error) {
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
 	}
-	req, err := http.NewRequest(method, url, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
@@ -88,11 +89,11 @@ func checkStatus(resp *http.Response, data []byte) error {
 }
 
 // ListEntries fetches all entries from the blog, following pagination.
-func (c *Client) ListEntries() ([]*Entry, error) {
+func (c *Client) ListEntries(ctx context.Context) ([]*Entry, error) {
 	url := c.collectionURL()
 	var all []*Entry
 	for url != "" {
-		resp, err := c.do(http.MethodGet, url, nil)
+		resp, err := c.do(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -114,8 +115,8 @@ func (c *Client) ListEntries() ([]*Entry, error) {
 }
 
 // GetEntry fetches a single entry by its edit URL.
-func (c *Client) GetEntry(editURL string) (*Entry, error) {
-	resp, err := c.do(http.MethodGet, editURL, nil)
+func (c *Client) GetEntry(ctx context.Context, editURL string) (*Entry, error) {
+	resp, err := c.do(ctx, http.MethodGet, editURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,12 +131,12 @@ func (c *Client) GetEntry(editURL string) (*Entry, error) {
 }
 
 // CreateEntry posts a new entry and returns the created entry.
-func (c *Client) CreateEntry(e *Entry) (*Entry, error) {
+func (c *Client) CreateEntry(ctx context.Context, e *Entry) (*Entry, error) {
 	body, err := marshalEntry(e)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.do(http.MethodPost, c.collectionURL(), body)
+	resp, err := c.do(ctx, http.MethodPost, c.collectionURL(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +151,12 @@ func (c *Client) CreateEntry(e *Entry) (*Entry, error) {
 }
 
 // UpdateEntry updates an existing entry via PUT to its edit URL.
-func (c *Client) UpdateEntry(editURL string, e *Entry) (*Entry, error) {
+func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*Entry, error) {
 	body, err := marshalEntry(e)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.do(http.MethodPut, editURL, body)
+	resp, err := c.do(ctx, http.MethodPut, editURL, body)
 	if err != nil {
 		return nil, err
 	}

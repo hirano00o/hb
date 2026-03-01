@@ -16,6 +16,7 @@ func newPushCmd() *cobra.Command {
 		Short: "Push a local file to Hatena Blog (POST if new, PUT if updated)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			path := args[0]
 			local, err := article.Read(path)
 			if err != nil {
@@ -34,7 +35,7 @@ func newPushCmd() *cobra.Command {
 
 			// No editUrl → new entry, POST
 			if local.Frontmatter.EditURL == "" {
-				created, err := client.CreateEntry(local.ToEntry())
+				created, err := client.CreateEntry(ctx, local.ToEntry())
 				if err != nil {
 					return err
 				}
@@ -49,7 +50,7 @@ func newPushCmd() *cobra.Command {
 			}
 
 			// Has editUrl → fetch remote and compare
-			remote, err := client.GetEntry(local.Frontmatter.EditURL)
+			remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
 			if err != nil {
 				return err
 			}
@@ -62,7 +63,7 @@ func newPushCmd() *cobra.Command {
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Tip: run 'hb diff %s' to review changes before pushing.\n", path)
 
-			updated, err := client.UpdateEntry(local.Frontmatter.EditURL, local.ToEntry())
+			updated, err := client.UpdateEntry(ctx, local.Frontmatter.EditURL, local.ToEntry())
 			if err != nil {
 				return err
 			}

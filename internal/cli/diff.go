@@ -16,6 +16,7 @@ func newDiffCmd() *cobra.Command {
 		Short: "Show unified diff between local file and remote entry",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			path := args[0]
 			local, err := article.Read(path)
 			if err != nil {
@@ -35,7 +36,7 @@ func newDiffCmd() *cobra.Command {
 			}
 
 			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
-			remote, err := client.GetEntry(local.Frontmatter.EditURL)
+			remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
 			if err != nil {
 				return err
 			}

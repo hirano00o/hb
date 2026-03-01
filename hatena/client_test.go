@@ -1,6 +1,7 @@
 package hatena
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -45,7 +46,7 @@ func TestListEntries_Pagination(t *testing.T) {
 	})
 
 	c := newTestClient(t, mux)
-	entries, err := c.ListEntries()
+	entries, err := c.ListEntries(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestGetEntry_OK(t *testing.T) {
 		w.Write(data)
 	})
 	c := newTestClient(t, mux)
-	entry, err := c.GetEntry(c.baseURL + "/user/example.hateblo.jp/atom/entry/123456789")
+	entry, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/123456789")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestGetEntry_NotFound(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	})
 	c := newTestClient(t, mux)
-	_, err := c.GetEntry(c.baseURL + "/user/example.hateblo.jp/atom/entry/999")
+	_, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/999")
 	if err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("expected 404 error, got %v", err)
 	}
@@ -91,7 +92,7 @@ func TestGetEntry_Unauthorized(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 	c := newTestClient(t, mux)
-	_, err := c.GetEntry(c.baseURL + "/user/example.hateblo.jp/atom/entry/1")
+	_, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/1")
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		t.Errorf("expected 401 error, got %v", err)
 	}
@@ -113,7 +114,7 @@ func TestCreateEntry_OK(t *testing.T) {
 	})
 	c := newTestClient(t, mux)
 	e := &Entry{Title: "New", Content: "body"}
-	created, err := c.CreateEntry(e)
+	created, err := c.CreateEntry(context.Background(), e)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,11 +138,26 @@ func TestUpdateEntry_OK(t *testing.T) {
 	})
 	c := newTestClient(t, mux)
 	e := &Entry{Title: "Updated", Content: "updated body"}
-	updated, err := c.UpdateEntry(c.baseURL+"/user/example.hateblo.jp/atom/entry/123456789", e)
+	updated, err := c.UpdateEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/123456789", e)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if updated.Title != "Test Entry Title" {
 		t.Errorf("title: got %q", updated.Title)
+	}
+}
+
+func TestGetEntry_ContextCancel(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/1", func(w http.ResponseWriter, r *http.Request) {
+		// server receives request but client already cancelled
+		w.WriteHeader(http.StatusOK)
+	})
+	c := newTestClient(t, mux)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+	_, err := c.GetEntry(ctx, c.baseURL+"/user/example.hateblo.jp/atom/entry/1")
+	if err == nil {
+		t.Error("expected error for cancelled context")
 	}
 }
