@@ -4,7 +4,7 @@ BINARY := hb
 CMD_DIR := ./cmd/hb
 
 build:
-	go build -o $(BINARY) $(CMD_DIR)
+	CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o $(BINARY) $(CMD_DIR)
 
 test:
 	go test ./...
