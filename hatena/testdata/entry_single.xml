@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom"
+       xmlns:app="http://www.w3.org/2007/app"
+       xmlns:hatenablog="http://www.hatena.ne.jp/info/xmlns#hatenablog">
+  <id>tag:blog.hatena.ne.jp,2013:blog-user-12345678901234-123456789</id>
+  <link rel="alternate" type="text/html" href="https://example.hateblo.jp/entry/2026/03/01/120000"/>
+  <link rel="edit" href="https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/123456789"/>
+  <author><name>user</name></author>
+  <title>Test Entry Title</title>
+  <updated>2026-03-01T12:00:00+09:00</updated>
+  <published>2026-03-01T12:00:00+09:00</published>
+  <summary type="text">summary text</summary>
+  <content type="text/x-markdown">This is the **body** content.</content>
+  <category term="Go"/>
+  <category term="CLI"/>
+  <app:control>
+    <app:draft>no</app:draft>
+  </app:control>
+  <hatenablog:custom-url>my-custom-path</hatenablog:custom-url>
+</entry>
