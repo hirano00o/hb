@@ -138,6 +138,143 @@ func TestPush_Draft_Conflict_Aborted(t *testing.T) {
 	}
 }
 
+// TestPush_ConfirmPrompt_Confirm verifies that answering 'y' to the confirmation prompt
+// causes the push to proceed and issue a PUT request.
+func TestPush_ConfirmPrompt_Confirm(t *testing.T) {
+	putCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/3", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			writeEntryXML(w, "Title", "remote body\n", false) // different from local
+		case http.MethodPut:
+			putCalled = true
+			body, _ := io.ReadAll(r.Body)
+			w.Write(body)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/3"
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/3",
+	}
+	path, _ := setupPushTest(t, editURL, fm, "local body\n")
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetIn(strings.NewReader("y\n"))
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out.String())
+	}
+	if !putCalled {
+		t.Error("expected PUT request after confirming with 'y'")
+	}
+}
+
+// TestPush_ConfirmPrompt_Abort verifies that answering 'N' to the confirmation prompt
+// aborts the push without issuing a PUT request.
+func TestPush_ConfirmPrompt_Abort(t *testing.T) {
+	putCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/4", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			writeEntryXML(w, "Title", "remote body\n", false)
+		case http.MethodPut:
+			putCalled = true
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/4"
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/4",
+	}
+	path, _ := setupPushTest(t, editURL, fm, "local body\n")
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetIn(strings.NewReader("N\n"))
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out.String())
+	}
+	if putCalled {
+		t.Error("expected no PUT request after aborting")
+	}
+	if !strings.Contains(out.String(), "Aborted") {
+		t.Errorf("expected 'Aborted' in output, got: %s", out.String())
+	}
+}
+
+// TestPush_YesFlag_SkipsPrompt verifies that --yes skips the confirmation prompt
+// and the push proceeds without reading from stdin.
+func TestPush_YesFlag_SkipsPrompt(t *testing.T) {
+	putCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/5", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			writeEntryXML(w, "Title", "remote body\n", false)
+		case http.MethodPut:
+			putCalled = true
+			body, _ := io.ReadAll(r.Body)
+			w.Write(body)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/5"
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/5",
+	}
+	path, _ := setupPushTest(t, editURL, fm, "local body\n")
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	// No stdin input: if the prompt is shown it would block or fail.
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"--yes", path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out.String())
+	}
+	if !putCalled {
+		t.Error("expected PUT request with --yes flag")
+	}
+}
+
 // writeEntryXML writes a minimal Atom entry XML to w.
 func writeEntryXML(w http.ResponseWriter, title, content string, draft bool) {
 	draftStr := "no"

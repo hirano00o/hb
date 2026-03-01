@@ -325,3 +325,33 @@ func TestResolveConflict_Force(t *testing.T) {
 		t.Error("expected auto-renamed path, got original")
 	}
 }
+
+// TestResolveConflict_CustomName_PathTraversal verifies that a path traversal attempt
+// in the custom name is neutralised and the file is placed in the original directory.
+func TestResolveConflict_CustomName_PathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("../../etc/passwd\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip")
+	}
+	// Must stay inside the original directory.
+	if filepath.Dir(dest) != dir {
+		t.Errorf("path escaped directory: got %s, want inside %s", dest, dir)
+	}
+	if filepath.Base(dest) != "passwd" {
+		t.Errorf("expected base name 'passwd', got %s", filepath.Base(dest))
+	}
+}

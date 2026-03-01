@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/hirano00o/hb/article"
 	"github.com/spf13/cobra"
@@ -107,18 +106,23 @@ func resolveConflict(cmd *cobra.Command, path string, force bool) (dest string, 
 	if input == "" {
 		return autoRename(path), false, nil
 	}
-	// User provided a custom name; place it in the same directory.
-	return filepath.Join(filepath.Dir(path), input), false, nil
+	// Use only the base name to prevent path traversal (e.g. "../../etc/passwd").
+	return filepath.Join(filepath.Dir(path), filepath.Base(input)), false, nil
 }
 
-// autoRename appends the current milliseconds (up to 4 digits) as a suffix to the base name.
-// e.g. "20260301_Title.md" → "20260301_Title_123.md"
+// autoRename generates a path that does not yet exist by appending an incrementing
+// counter suffix to the base name.
+// e.g. "20260301_Title.md" → "20260301_Title_1.md", "_2.md", …
 func autoRename(path string) string {
-	ms := time.Now().UnixMilli() % 10000
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(filepath.Base(path), ext)
 	dir := filepath.Dir(path)
-	return filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, ms, ext))
+	for i := 1; ; i++ {
+		candidate := filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+	}
 }
 
 // collectLocalEditURLs walks the given directory recursively and collects all editUrl values

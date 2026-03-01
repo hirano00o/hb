@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/hirano00o/hb/config"
@@ -120,7 +121,11 @@ func readPassword(cmd *cobra.Command, scanner *bufio.Scanner) (string, error) {
 	}
 	// Non-terminal fallback: read via scanner (no masking).
 	if !scanner.Scan() {
-		return "", scanner.Err()
+		if err := scanner.Err(); err != nil {
+			return "", err
+		}
+		// scanner.Err() == nil means EOF; treat as missing input rather than success.
+		return "", io.ErrUnexpectedEOF
 	}
 	return strings.TrimSpace(scanner.Text()), nil
 }
