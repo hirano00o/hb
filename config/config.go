@@ -95,7 +95,9 @@ func Merge(global, project *Config) *Config {
 	return &merged
 }
 
-// LoadMerged loads the global config, optionally merges the project config if found, and returns the result.
+// LoadMerged loads the global config, optionally merges the project config if found,
+// then applies environment variable overrides (HB_HATENA_ID, HB_BLOG_ID, HB_API_KEY).
+// Priority: env vars > project config > global config.
 func LoadMerged() (*Config, error) {
 	globalPath, err := GlobalConfigPath()
 	if err != nil {
@@ -109,16 +111,29 @@ func LoadMerged() (*Config, error) {
 		global = &Config{}
 	}
 
+	var merged *Config
 	projectPath, err := ProjectConfigPath()
 	if err != nil {
 		// no project config; use global only
-		return global, nil
+		merged = global
+	} else {
+		project, err := Load(projectPath)
+		if err != nil {
+			return nil, err
+		}
+		merged = Merge(global, project)
 	}
-	project, err := Load(projectPath)
-	if err != nil {
-		return nil, err
+
+	if v := os.Getenv("HB_HATENA_ID"); v != "" {
+		merged.HatenaID = v
 	}
-	return Merge(global, project), nil
+	if v := os.Getenv("HB_BLOG_ID"); v != "" {
+		merged.BlogID = v
+	}
+	if v := os.Getenv("HB_API_KEY"); v != "" {
+		merged.APIKey = v
+	}
+	return merged, nil
 }
 
 // Validate returns an error if any required field is empty.

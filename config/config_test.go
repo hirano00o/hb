@@ -211,6 +211,38 @@ func TestProjectConfigPath_Found(t *testing.T) {
 	}
 }
 
+func TestLoadMerged_EnvOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	globalDir := filepath.Join(dir, "hb")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "config.yaml"),
+		[]byte("hatena_id: guser\nblog_id: gblog\napi_key: gkey\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	t.Setenv("HB_HATENA_ID", "envuser")
+	t.Setenv("HB_BLOG_ID", "envblog")
+	t.Setenv("HB_API_KEY", "envkey")
+
+	cfg, err := config.LoadMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.HatenaID != "envuser" {
+		t.Errorf("HatenaID should be overridden by env, got %s", cfg.HatenaID)
+	}
+	if cfg.BlogID != "envblog" {
+		t.Errorf("BlogID should be overridden by env, got %s", cfg.BlogID)
+	}
+	if cfg.APIKey != "envkey" {
+		t.Errorf("APIKey should be overridden by env, got %s", cfg.APIKey)
+	}
+}
+
 func TestProjectConfigPath_NotFound(t *testing.T) {
 	t.Chdir(t.TempDir())
 	_, err := config.ProjectConfigPath()

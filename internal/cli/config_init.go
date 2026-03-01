@@ -10,23 +10,15 @@ import (
 )
 
 func newConfigInitCmd() *cobra.Command {
-	var hatenaID, blogID, apiKey string
+	var hatenaID, blogID string
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize the global hb configuration (~/.config/hb/config.yaml)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := &config.Config{}
-			if hatenaID != "" && blogID != "" && apiKey != "" {
-				cfg.HatenaID = hatenaID
-				cfg.BlogID = blogID
-				cfg.APIKey = apiKey
-			} else {
-				var err error
-				cfg, err = promptConfig(cmd, hatenaID, blogID, apiKey)
-				if err != nil {
-					return err
-				}
+			cfg, err := promptConfig(cmd, hatenaID, blogID)
+			if err != nil {
+				return err
 			}
 			if err := config.Validate(cfg); err != nil {
 				return err
@@ -45,12 +37,11 @@ func newConfigInitCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&hatenaID, "hatena-id", "", "Hatena ID")
 	cmd.Flags().StringVar(&blogID, "blog-id", "", "Blog ID (e.g. example.hateblo.jp)")
-	cmd.Flags().StringVar(&apiKey, "api-key", "", "Hatena Blog API key")
 
 	return cmd
 }
 
-func promptConfig(cmd *cobra.Command, hatenaID, blogID, apiKey string) (*config.Config, error) {
+func promptConfig(cmd *cobra.Command, hatenaID, blogID string) (*config.Config, error) {
 	scanner := bufio.NewScanner(cmd.InOrStdin())
 	cfg := &config.Config{}
 
@@ -74,15 +65,11 @@ func promptConfig(cmd *cobra.Command, hatenaID, blogID, apiKey string) (*config.
 		cfg.BlogID = strings.TrimSpace(scanner.Text())
 	}
 
-	if apiKey != "" {
-		cfg.APIKey = apiKey
-	} else {
-		fmt.Fprint(cmd.OutOrStdout(), "API Key: ")
-		if !scanner.Scan() {
-			return nil, fmt.Errorf("read API key: %w", scanner.Err())
-		}
-		cfg.APIKey = strings.TrimSpace(scanner.Text())
+	fmt.Fprint(cmd.OutOrStdout(), "API Key: ")
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("read API key: %w", scanner.Err())
 	}
+	cfg.APIKey = strings.TrimSpace(scanner.Text())
 
 	return cfg, nil
 }
