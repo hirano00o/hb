@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"strings"
 
 	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
+	"github.com/spf13/cobra"
 )
 
 // newClientFromConfig loads and validates configuration, then returns a new API client.
@@ -17,4 +20,15 @@ func newClientFromConfig() (*hatena.Client, error) {
 		return nil, fmt.Errorf("config: %w", err)
 	}
 	return hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey), nil
+}
+
+// confirmAction prints prompt and reads a y/Y response from stdin.
+// Returns true when the user confirms, false otherwise (including EOF).
+func confirmAction(cmd *cobra.Command, prompt string) (bool, error) {
+	fmt.Fprint(cmd.OutOrStdout(), prompt)
+	scanner := bufio.NewScanner(cmd.InOrStdin())
+	if !scanner.Scan() {
+		return false, scanner.Err()
+	}
+	return strings.EqualFold(strings.TrimSpace(scanner.Text()), "y"), nil
 }

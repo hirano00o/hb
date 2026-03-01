@@ -9,7 +9,9 @@ import (
 )
 
 func newPushCmd() *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+
+	cmd := &cobra.Command{
 		Use:   "push <file>",
 		Short: "Push a local file to Hatena Blog (POST if new, PUT if updated)",
 		Args:  cobra.ExactArgs(1),
@@ -54,7 +56,22 @@ func newPushCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Tip: run 'hb diff %s' to review changes before pushing.\n", path)
+			diff, err := unifiedDiff(path, remoteArticle, local)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), diff)
+
+			if !yes {
+				ok, err := confirmAction(cmd, "Push these changes? [y/N]: ")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+					return nil
+				}
+			}
 
 			updated, err := client.UpdateEntry(ctx, local.Frontmatter.EditURL, local.ToEntry())
 			if err != nil {
@@ -68,6 +85,9 @@ func newPushCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
+	return cmd
 }
 
 // hasChanges returns true if the local article differs from the remote in any field.

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -46,13 +45,12 @@ func newFetchCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Fprint(cmd.OutOrStdout(), diff)
-			fmt.Fprint(cmd.OutOrStdout(), "Overwrite local file? [y/N]: ")
 
-			scanner := bufio.NewScanner(cmd.InOrStdin())
-			if !scanner.Scan() {
-				return scanner.Err()
+			ok, err := confirmAction(cmd, "Overwrite local file? [y/N]: ")
+			if err != nil {
+				return err
 			}
-			if !strings.EqualFold(strings.TrimSpace(scanner.Text()), "y") {
+			if !ok {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
 			}
