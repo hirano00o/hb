@@ -98,7 +98,6 @@ func (a *Article) ToEntry() *hatena.Entry {
 		Title:      a.Frontmatter.Title,
 		Content:    a.Body,
 		Date:       a.Frontmatter.Date,
-		Updated:    a.Frontmatter.Date,
 		Draft:      a.Frontmatter.Draft,
 		Categories: a.Frontmatter.Category,
 		URL:        a.Frontmatter.URL,
