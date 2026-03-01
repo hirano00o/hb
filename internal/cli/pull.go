@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/hirano00o/hb/article"
-	"github.com/hirano00o/hb/config"
-	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 )
 
@@ -20,15 +18,10 @@ func newPullCmd() *cobra.Command {
 		Short: "Pull all remote entries to local Markdown files",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			cfg, err := config.LoadMerged()
+			client, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
-			if err := config.Validate(cfg); err != nil {
-				return fmt.Errorf("config: %w", err)
-			}
-
-			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
 			entries, err := client.ListEntries(ctx)
 			if err != nil {
 				return err
