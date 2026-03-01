@@ -7,6 +7,7 @@ import (
 
 	"github.com/hirano00o/hb/config"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 func newConfigInitCmd() *cobra.Command {
@@ -66,10 +67,35 @@ func promptConfig(cmd *cobra.Command, hatenaID, blogID string) (*config.Config, 
 	}
 
 	fmt.Fprint(cmd.OutOrStdout(), "API Key: ")
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("read API key: %w", scanner.Err())
+	apiKey, err := readPassword(cmd, scanner)
+	if err != nil {
+		return nil, fmt.Errorf("read API key: %w", err)
 	}
-	cfg.APIKey = strings.TrimSpace(scanner.Text())
+	cfg.APIKey = apiKey
 
 	return cfg, nil
+}
+
+// readPassword reads a password from the terminal with masking if stdin is a terminal,
+// or falls back to plain text reading via scanner when stdin is not a terminal (e.g. pipe).
+func readPassword(cmd *cobra.Command, scanner *bufio.Scanner) (string, error) {
+	// Try to get the file descriptor of stdin for terminal detection.
+	type fder interface{ Fd() uintptr }
+	if f, ok := cmd.InOrStdin().(fder); ok {
+		fd := int(f.Fd())
+		if term.IsTerminal(fd) {
+			raw, err := term.ReadPassword(fd)
+			if err != nil {
+				return "", err
+			}
+			// term.ReadPassword does not print a newline.
+			fmt.Fprintln(cmd.OutOrStdout())
+			return string(raw), nil
+		}
+	}
+	// Non-terminal fallback: read via scanner (no masking).
+	if !scanner.Scan() {
+		return "", scanner.Err()
+	}
+	return strings.TrimSpace(scanner.Text()), nil
 }
