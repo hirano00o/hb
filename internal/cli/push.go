@@ -57,7 +57,6 @@ func newPushCmd() *cobra.Command {
 
 			if !hasChanges(local, remoteArticle) {
 				fmt.Fprintln(cmd.OutOrStdout(), "No changes to push.")
-				fmt.Fprintf(cmd.OutOrStdout(), "Run 'hb diff %s' to review differences.\n", path)
 				return nil
 			}
 
