@@ -24,12 +24,28 @@ make build
 hb config init
 ```
 
-対話形式で Hatena ID・Blog ID・API キーを入力します。`~/.config/hb/config.yaml` に保存されます。
+対話形式で Hatena ID・Blog ID・API キーを入力します。API キー入力時はターミナル上でマスキングされます。
+設定は `~/.config/hb/config.yaml` に保存されます。
 
-フラグで一括指定することもできます:
+フラグで Hatena ID と Blog ID を指定することもできます（API キーは必ずマスキングされた対話入力):
 
 ```sh
-hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp --api-key YOUR_KEY
+hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
+```
+
+### 環境変数による設定オーバーライド
+
+コンフィグファイルよりも環境変数が優先されます。CI/CD などでの利用に便利です。
+
+| 環境変数 | 説明 |
+|---|---|
+| `HB_HATENA_ID` | Hatena ID |
+| `HB_BLOG_ID` | Blog ID |
+| `HB_API_KEY` | API キー |
+
+```sh
+export HB_API_KEY=your_api_key
+hb push article.md
 ```
 
 ### プロジェクト設定（オプション）
@@ -50,11 +66,18 @@ hb init
 リモートの全記事をローカルのMarkdownファイルとして取得します。
 
 ```sh
-hb pull [--force] [--dir <directory>]
+hb pull [--force|-f] [--dir <directory>]
 ```
 
-- `--force`: 既存ファイルを上書き（デフォルトは editUrl が一致するファイルをスキップ）
+- `--force` / `-f`: ファイル名が衝突したときに確認なしで自動リネーム（ミリ秒suffix付与）
 - `--dir`: 保存先ディレクトリ（デフォルト: カレントディレクトリ）
+
+ファイル名が既存ファイルと衝突した場合（`--force` なし）:
+1. **カスタム名**を入力 → そのファイル名で保存
+2. **Enter（空入力）** → ミリ秒suffix（最大4桁）を自動付与してリネーム
+3. **`s`** → この記事のダウンロードをスキップ
+
+既に `editUrl` が一致するローカルファイルがある記事は自動的にスキップされます。
 
 ### `hb fetch <file>`
 
@@ -69,10 +92,24 @@ hb fetch 20260301_my-article.md
 ローカルファイルをリモートへ送信します。
 
 - `editUrl` が frontmatter に**ない**場合 → 新規投稿（POST）
-- `editUrl` が frontmatter に**ある**場合 → 差分があれば更新（PUT）
+- `editUrl` が frontmatter に**ある**場合 → 差分表示後に確認してから更新（PUT）
 
 ```sh
+hb push [--yes|-y] [--draft] <file>
+```
+
+- `--yes` / `-y`: 確認プロンプトをスキップ
+- `--draft`: 下書きとして投稿。frontmatter の `draft` 値と異なる場合は確認プロンプトを表示
+
+```sh
+# 差分を確認しながらpush
 hb push 20260301_my-article.md
+
+# 確認なしでpush
+hb push --yes 20260301_my-article.md
+
+# 下書きとして強制push（確認あり）
+hb push --draft 20260301_my-article.md
 ```
 
 ### `hb diff <file>`
@@ -127,7 +164,7 @@ customUrlPath: my-custom-path
 
 ## 設定ファイルの優先度
 
-グローバル設定（`~/.config/hb/config.yaml`）をベースとして、プロジェクト設定（`.hb/config.yaml`）の非空フィールドでオーバーライドします。
+環境変数 > プロジェクト設定（`.hb/config.yaml`）> グローバル設定（`~/.config/hb/config.yaml`）
 
 ## 開発
 
