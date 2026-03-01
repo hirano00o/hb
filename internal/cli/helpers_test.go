@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/spf13/cobra"
 )
 
 func makeArticle(title, body string, draft bool) *article.Article {
@@ -161,3 +162,196 @@ func TestCollectLocalEditURLs(t *testing.T) {
 	}
 }
 
+// TestConfirmAction verifies confirmAction returns the correct boolean for various inputs.
+func TestConfirmAction(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{"y\n", true},
+		{"Y\n", true},
+		{"n\n", false},
+		{"N\n", false},
+		{"\n", false},   // empty line → no
+		{"yes\n", false}, // full word not accepted
+	}
+	for _, tc := range cases {
+		cmd := &cobra.Command{}
+		cmd.SetIn(strings.NewReader(tc.input))
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		got, err := confirmAction(cmd, "Confirm? [y/N]: ")
+		if err != nil {
+			t.Errorf("input %q: unexpected error: %v", tc.input, err)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("input %q: got %v, want %v", tc.input, got, tc.want)
+		}
+	}
+}
+
+// TestConfirmAction_EOF verifies confirmAction returns false (no error) on EOF.
+func TestConfirmAction_EOF(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader(""))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	got, err := confirmAction(cmd, "Confirm? [y/N]: ")
+	if err != nil {
+		t.Errorf("unexpected error on EOF: %v", err)
+	}
+	if got {
+		t.Error("expected false on EOF")
+	}
+}
+
+// TestResolveConflict_NoExist verifies that a non-existent path is returned as-is.
+func TestResolveConflict_NoExist(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader(""))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, filepath.Join(t.TempDir(), "nonexistent.md"), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip for non-existent file")
+	}
+	if !strings.HasSuffix(dest, "nonexistent.md") {
+		t.Errorf("expected original path, got %s", dest)
+	}
+}
+
+// TestResolveConflict_Skip verifies that 's' input causes a skip.
+func TestResolveConflict_Skip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("s\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	_, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !skip {
+		t.Error("expected skip for 's' input")
+	}
+}
+
+// TestResolveConflict_CustomName verifies that a user-provided name is used.
+func TestResolveConflict_CustomName(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("renamed.md\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip")
+	}
+	if !strings.HasSuffix(dest, "renamed.md") {
+		t.Errorf("expected renamed.md, got %s", dest)
+	}
+}
+
+// TestResolveConflict_AutoRename verifies that empty input triggers auto-rename.
+func TestResolveConflict_AutoRename(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip")
+	}
+	if dest == path {
+		t.Error("expected auto-renamed path, got original")
+	}
+	if !strings.HasSuffix(dest, ".md") {
+		t.Errorf("expected .md extension, got %s", dest)
+	}
+}
+
+// TestResolveConflict_Force verifies that --force triggers auto-rename without prompting.
+func TestResolveConflict_Force(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	// no input; force should not read from stdin
+	cmd.SetIn(strings.NewReader(""))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip for force")
+	}
+	if dest == path {
+		t.Error("expected auto-renamed path, got original")
+	}
+}
+
+// TestResolveConflict_CustomName_PathTraversal verifies that a path traversal attempt
+// in the custom name is neutralised and the file is placed in the original directory.
+func TestResolveConflict_CustomName_PathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.md")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader("../../etc/passwd\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	dest, skip, err := resolveConflict(cmd, path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skip {
+		t.Error("expected no skip")
+	}
+	// Must stay inside the original directory.
+	if filepath.Dir(dest) != dir {
+		t.Errorf("path escaped directory: got %s, want inside %s", dest, dir)
+	}
+	if filepath.Base(dest) != "passwd" {
+		t.Errorf("expected base name 'passwd', got %s", filepath.Base(dest))
+	}
+}

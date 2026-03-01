@@ -155,4 +155,7 @@ func TestToEntry(t *testing.T) {
 	if e.Content != "content" {
 		t.Errorf("content: got %q", e.Content)
 	}
+	if !e.Updated.IsZero() {
+		t.Errorf("Updated should be zero (set by server), got %v", e.Updated)
+	}
 }

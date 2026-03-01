@@ -5,36 +5,52 @@ import (
 	"slices"
 
 	"github.com/hirano00o/hb/article"
-	"github.com/hirano00o/hb/config"
-	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 )
 
 func newPushCmd() *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+	var draft bool
+	var draftSet bool
+
+	cmd := &cobra.Command{
 		Use:   "push <file>",
 		Short: "Push a local file to Hatena Blog (POST if new, PUT if updated)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			path := args[0]
 			local, err := article.Read(path)
 			if err != nil {
 				return fmt.Errorf("read %s: %w", path, err)
 			}
 
-			cfg, err := config.LoadMerged()
+			client, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
-			if err := config.Validate(cfg); err != nil {
-				return fmt.Errorf("config: %w", err)
-			}
 
-			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
+			// Apply --draft override when the flag was explicitly set.
+			if draftSet && draft != local.Frontmatter.Draft {
+				ok, err := confirmAction(cmd, fmt.Sprintf(
+					"Frontmatter draft=%v but --draft=%v. Push as draft=%v? [y/N]: ",
+					local.Frontmatter.Draft, draft, draft,
+				))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+					return nil
+				}
+				local.Frontmatter.Draft = draft
+			} else if draftSet {
+				local.Frontmatter.Draft = draft
+			}
 
 			// No editUrl → new entry, POST
 			if local.Frontmatter.EditURL == "" {
-				created, err := client.CreateEntry(local.ToEntry())
+				created, err := client.CreateEntry(ctx, local.ToEntry())
 				if err != nil {
 					return err
 				}
@@ -49,7 +65,7 @@ func newPushCmd() *cobra.Command {
 			}
 
 			// Has editUrl → fetch remote and compare
-			remote, err := client.GetEntry(local.Frontmatter.EditURL)
+			remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
 			if err != nil {
 				return err
 			}
@@ -57,13 +73,27 @@ func newPushCmd() *cobra.Command {
 
 			if !hasChanges(local, remoteArticle) {
 				fmt.Fprintln(cmd.OutOrStdout(), "No changes to push.")
-				fmt.Fprintf(cmd.OutOrStdout(), "Run 'hb diff %s' to review differences.\n", path)
 				return nil
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Tip: run 'hb diff %s' to review changes before pushing.\n", path)
+			diff, err := unifiedDiff(path, remoteArticle, local)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), diff)
 
-			updated, err := client.UpdateEntry(local.Frontmatter.EditURL, local.ToEntry())
+			if !yes {
+				ok, err := confirmAction(cmd, "Push these changes? [y/N]: ")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+					return nil
+				}
+			}
+
+			updated, err := client.UpdateEntry(ctx, local.Frontmatter.EditURL, local.ToEntry())
 			if err != nil {
 				return err
 			}
@@ -75,6 +105,15 @@ func newPushCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&draft, "draft", false, "Override entry draft status")
+	// Track whether --draft was explicitly specified on the command line.
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		draftSet = cmd.Flags().Changed("draft")
+		return nil
+	}
+	return cmd
 }
 
 // hasChanges returns true if the local article differs from the remote in any field.

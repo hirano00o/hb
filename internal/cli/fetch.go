@@ -1,15 +1,12 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
 
 	"github.com/hirano00o/hb/article"
-	"github.com/hirano00o/hb/config"
-	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +16,7 @@ func newFetchCmd() *cobra.Command {
 		Short: "Fetch the remote version of an entry and overwrite the local file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 			path := args[0]
 			local, err := article.Read(path)
 			if err != nil {
@@ -28,16 +26,11 @@ func newFetchCmd() *cobra.Command {
 				return fmt.Errorf("%s has no editUrl in frontmatter; use 'hb pull' first", path)
 			}
 
-			cfg, err := config.LoadMerged()
+			client, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
-			if err := config.Validate(cfg); err != nil {
-				return fmt.Errorf("config: %w", err)
-			}
-
-			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
-			remote, err := client.GetEntry(local.Frontmatter.EditURL)
+			remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
 			if err != nil {
 				return err
 			}
@@ -52,13 +45,12 @@ func newFetchCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Fprint(cmd.OutOrStdout(), diff)
-			fmt.Fprint(cmd.OutOrStdout(), "Overwrite local file? [y/N]: ")
 
-			scanner := bufio.NewScanner(cmd.InOrStdin())
-			if !scanner.Scan() {
-				return scanner.Err()
+			ok, err := confirmAction(cmd, "Overwrite local file? [y/N]: ")
+			if err != nil {
+				return err
 			}
-			if !strings.EqualFold(strings.TrimSpace(scanner.Text()), "y") {
+			if !ok {
 				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 				return nil
 			}
