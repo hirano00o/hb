@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom"
+       xmlns:app="http://www.w3.org/2007/app"
+       xmlns:hatenablog="http://www.hatena.ne.jp/info/xmlns#hatenablog">
+  <id>tag:blog.hatena.ne.jp,2013:blog-user-12345678901234-999999999</id>
+  <link rel="alternate" type="text/html" href=""/>
+  <link rel="edit" href="https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/999999999"/>
+  <author><name>user</name></author>
+  <title>Draft Entry</title>
+  <updated>2026-03-01T10:00:00+09:00</updated>
+  <published>2026-03-01T10:00:00+09:00</published>
+  <content type="text/x-markdown">Draft body.</content>
+  <app:control>
+    <app:draft>yes</app:draft>
+  </app:control>
+</entry>
