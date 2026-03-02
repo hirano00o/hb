@@ -11,7 +11,10 @@ import (
 )
 
 // newClientFromConfig loads and validates configuration, then returns a new API client.
-func newClientFromConfig() (*hatena.Client, error) {
+// It is a package-level variable so tests can inject a stub client.
+var newClientFromConfig = defaultNewClientFromConfig
+
+func defaultNewClientFromConfig() (*hatena.Client, error) {
 	cfg, err := config.LoadMerged()
 	if err != nil {
 		return nil, err
