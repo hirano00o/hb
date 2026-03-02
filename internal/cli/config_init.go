@@ -23,12 +23,12 @@ func newConfigInitCmd() *cobra.Command {
 			if global {
 				return runGlobalInit(cmd, hatenaID, blogID)
 			}
-			return runProjectInit(cmd)
+			return runProjectInit(cmd, hatenaID, blogID)
 		},
 	}
 
-	cmd.Flags().StringVar(&hatenaID, "hatena-id", "", "Hatena ID (used with -g)")
-	cmd.Flags().StringVar(&blogID, "blog-id", "", "Blog ID, e.g. example.hateblo.jp (used with -g)")
+	cmd.Flags().StringVar(&hatenaID, "hatena-id", "", "Hatena ID")
+	cmd.Flags().StringVar(&blogID, "blog-id", "", "Blog ID, e.g. example.hateblo.jp")
 	cmd.Flags().BoolVarP(&global, "global", "g", false, "Initialize the global config (~/.config/hb/config.yaml)")
 
 	return cmd
@@ -65,10 +65,11 @@ func runGlobalInit(cmd *cobra.Command, hatenaID, blogID string) error {
 	return nil
 }
 
-func runProjectInit(cmd *cobra.Command) error {
+func runProjectInit(cmd *cobra.Command, hatenaID, blogID string) error {
 	const projectConfigFile = ".hb/config.yaml"
+	scanner := bufio.NewScanner(cmd.InOrStdin())
 	if _, err := os.Stat(projectConfigFile); err == nil {
-		ok, err := confirmAction(cmd, fmt.Sprintf("%s already exists. Overwrite? [y/N]: ", projectConfigFile))
+		ok, err := confirmActionWithScanner(cmd, scanner, fmt.Sprintf("%s already exists. Overwrite? [y/N]: ", projectConfigFile))
 		if err != nil {
 			return err
 		}
@@ -77,7 +78,10 @@ func runProjectInit(cmd *cobra.Command) error {
 			return nil
 		}
 	}
-	cfg := &config.Config{}
+	cfg, err := promptConfigWithScanner(cmd, scanner, hatenaID, blogID)
+	if err != nil {
+		return err
+	}
 	if err := config.Save(projectConfigFile, cfg); err != nil {
 		return err
 	}
@@ -114,7 +118,9 @@ func promptConfigWithScanner(cmd *cobra.Command, scanner *bufio.Scanner, hatenaI
 	if err != nil {
 		return nil, fmt.Errorf("read API key: %w", err)
 	}
-	cfg.APIKey = apiKey
+	if apiKey != "" {
+		cfg.APIKey = apiKey
+	}
 
 	return cfg, nil
 }

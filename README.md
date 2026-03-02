@@ -21,13 +21,28 @@ make build
 ### グローバル設定（初回のみ）
 
 ```sh
-hb config init
+hb config init -g
 ```
 
 対話形式で Hatena ID・Blog ID・API キーを入力します。API キー入力時はターミナル上でマスキングされます。
 設定は `~/.config/hb/config.yaml` に保存されます。
 
 フラグで Hatena ID と Blog ID を指定することもできます（API キーは必ずマスキングされた対話入力):
+
+```sh
+hb config init -g --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
+```
+
+### プロジェクト設定（任意）
+
+グローバル設定の値をプロジェクトごとに上書きしたい場合は、プロジェクトルートで実行します:
+
+```sh
+hb config init
+```
+
+対話形式で各フィールドを入力します。空 Enter でスキップしたフィールドはファイルに書き込まれず、グローバル設定が使われます。
+設定は `.hb/config.yaml` に保存されます。フラグでも指定できます:
 
 ```sh
 hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
@@ -125,11 +140,9 @@ hb diff 20260301_my-article.md
 
 ### `hb config init`
 
-グローバル設定を初期化します。
+プロジェクトローカル設定を対話形式で初期化します。空 Enter でスキップしたフィールドはファイルに書き込まれません。
 
-### `hb init`
-
-プロジェクトローカル設定を初期化します。
+`-g` フラグでグローバル設定を初期化します（全フィールドの入力が必須）。
 
 ## フロントマター仕様
 

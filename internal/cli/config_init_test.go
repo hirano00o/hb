@@ -63,7 +63,8 @@ func TestReadPassword_NonTerminal_Whitespace(t *testing.T) {
 	}
 }
 
-// TestConfigInit_Project_Creates verifies that `config init` (without -g) creates .hb/config.yaml.
+// TestConfigInit_Project_Creates verifies that `config init` (without -g) creates .hb/config.yaml
+// and that empty-Enter inputs result in no fields written to the file.
 func TestConfigInit_Project_Creates(t *testing.T) {
 	dir := t.TempDir()
 	orig, _ := os.Getwd()
@@ -75,17 +76,29 @@ func TestConfigInit_Project_Creates(t *testing.T) {
 	cmd := newConfigInitCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetIn(strings.NewReader(""))
+	// Hatena ID (empty), Blog ID (empty), API Key (empty)
+	cmd.SetIn(strings.NewReader("\n\n\n"))
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, ".hb", "config.yaml")); err != nil {
+	cfgPath := filepath.Join(dir, ".hb", "config.yaml")
+	if _, err := os.Stat(cfgPath); err != nil {
 		t.Errorf("expected .hb/config.yaml to exist: %v", err)
 	}
 	if !strings.Contains(out.String(), "Project config created at") {
 		t.Errorf("unexpected output: %q", out.String())
+	}
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(data)
+	for _, field := range []string{"hatena_id", "blog_id", "api_key"} {
+		if strings.Contains(content, field) {
+			t.Errorf("expected %s not to appear in config, got:\n%s", field, content)
+		}
 	}
 }
 
@@ -108,7 +121,8 @@ func TestConfigInit_Project_OverwriteYes(t *testing.T) {
 	cmd := newConfigInitCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetIn(strings.NewReader("y\n"))
+	// confirm overwrite=y, then Hatena ID (empty), Blog ID (empty), API Key (empty)
+	cmd.SetIn(strings.NewReader("y\n\n\n\n"))
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -147,6 +161,80 @@ func TestConfigInit_Project_OverwriteNo(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Aborted.") {
 		t.Errorf("expected Aborted., got: %q", out.String())
+	}
+}
+
+// TestConfigInit_Project_WithInput verifies that interactive input values are written to the project config.
+func TestConfigInit_Project_WithInput(t *testing.T) {
+	dir := t.TempDir()
+	orig, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(orig) //nolint:errcheck
+
+	cmd := newConfigInitCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	// Hatena ID, Blog ID, API Key
+	cmd.SetIn(strings.NewReader("myid\nmyblog.hateblo.jp\nmyapikey\n"))
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, ".hb", "config.yaml")
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{"hatena_id: myid", "blog_id: myblog.hateblo.jp", "api_key: myapikey"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("expected %q in config, got:\n%s", want, content)
+		}
+	}
+}
+
+// TestConfigInit_Project_WithFlags verifies that --hatena-id and --blog-id flags are written to the project config.
+func TestConfigInit_Project_WithFlags(t *testing.T) {
+	dir := t.TempDir()
+	orig, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(orig) //nolint:errcheck
+
+	cmd := newConfigInitCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	// API Key (empty) — only API Key is prompted when flags are provided
+	cmd.SetIn(strings.NewReader("\n"))
+
+	if err := cmd.Flags().Set("hatena-id", "flagid"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("blog-id", "flagblog.hateblo.jp"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, ".hb", "config.yaml")
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{"hatena_id: flagid", "blog_id: flagblog.hateblo.jp"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("expected %q in config, got:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "api_key") {
+		t.Errorf("expected api_key not to appear in config (empty input), got:\n%s", content)
 	}
 }
 
