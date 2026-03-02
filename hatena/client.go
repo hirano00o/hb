@@ -88,11 +88,12 @@ func checkStatus(resp *http.Response, data []byte) error {
 	}
 }
 
-// ListEntries fetches all entries from the blog, following pagination.
-func (c *Client) ListEntries(ctx context.Context) ([]*Entry, error) {
+// ListEntries fetches entries from the blog, following pagination.
+// maxPages limits the number of pages fetched; 0 means no limit.
+func (c *Client) ListEntries(ctx context.Context, maxPages int) ([]*Entry, error) {
 	url := c.collectionURL()
 	var all []*Entry
-	for url != "" {
+	for page := 1; url != ""; page++ {
 		resp, err := c.do(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return nil, err
@@ -109,6 +110,9 @@ func (c *Client) ListEntries(ctx context.Context) ([]*Entry, error) {
 			return nil, err
 		}
 		all = append(all, entries...)
+		if maxPages > 0 && page >= maxPages {
+			break
+		}
 		url = nextURL
 	}
 	return all, nil

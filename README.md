@@ -58,6 +58,7 @@ hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
 | `HB_BLOG_ID` | Blog ID |
 | `HB_API_KEY` | API キー |
 | `HB_CONCURRENCY` | pull の並列実行数（デフォルト: 5） |
+| `HB_MAX_PAGES` | pull のページ取得上限（デフォルト: 0 = 無制限） |
 
 ```sh
 export HB_API_KEY=your_api_key
@@ -189,6 +190,7 @@ hatena_id: yourhatenaId
 blog_id: yourblog.hateblo.jp
 api_key: your_api_key
 concurrency: 10  # pull の並列実行数（デフォルト: 5）
+max_pages: 5     # pull のページ取得上限（デフォルト: 0 = 無制限）
 ```
 
 ## 開発

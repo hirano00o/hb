@@ -290,6 +290,103 @@ func TestLoadMerged_ConcurrencyEnvOverride(t *testing.T) {
 	}
 }
 
+func TestMerge_MaxPages(t *testing.T) {
+	global := &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", MaxPages: 3}
+	project := &config.Config{MaxPages: 10}
+	merged := config.Merge(global, project)
+	if merged.MaxPages != 10 {
+		t.Errorf("MaxPages should be overridden by project, got %d", merged.MaxPages)
+	}
+
+	// Zero in project must not override global.
+	project2 := &config.Config{}
+	merged2 := config.Merge(global, project2)
+	if merged2.MaxPages != 3 {
+		t.Errorf("MaxPages should be kept from global when project is 0, got %d", merged2.MaxPages)
+	}
+}
+
+func TestLoadMerged_MaxPagesEnvOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	globalDir := filepath.Join(dir, "hb")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "config.yaml"),
+		[]byte("hatena_id: u\nblog_id: b\napi_key: k\nmax_pages: 3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	t.Setenv("HB_MAX_PAGES", "5")
+	cfg, err := config.LoadMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MaxPages != 5 {
+		t.Errorf("MaxPages should be 5 from env, got %d", cfg.MaxPages)
+	}
+}
+
+func TestLoadMerged_MaxPagesEnvZero(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	globalDir := filepath.Join(dir, "hb")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "config.yaml"),
+		[]byte("hatena_id: u\nblog_id: b\napi_key: k\nmax_pages: 3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	// 0 is valid for MaxPages (means no limit).
+	t.Setenv("HB_MAX_PAGES", "0")
+	cfg, err := config.LoadMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MaxPages != 0 {
+		t.Errorf("MaxPages should be 0 from env, got %d", cfg.MaxPages)
+	}
+}
+
+func TestLoadMerged_MaxPagesEnvInvalid(t *testing.T) {
+	setupGlobalConfig := func(t *testing.T) {
+		t.Helper()
+		dir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", dir)
+		if err := os.MkdirAll(filepath.Join(dir, "hb"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "hb", "config.yaml"),
+			[]byte("hatena_id: u\nblog_id: b\napi_key: k\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Chdir(t.TempDir())
+	}
+
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"non-integer", "invalid"},
+		{"negative", "-1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupGlobalConfig(t)
+			t.Setenv("HB_MAX_PAGES", tt.value)
+			_, err := config.LoadMerged()
+			if err == nil {
+				t.Fatalf("expected error for HB_MAX_PAGES=%q", tt.value)
+			}
+		})
+	}
+}
+
 func TestLoadMerged_ConcurrencyEnvInvalid(t *testing.T) {
 	setupGlobalConfig := func(t *testing.T) {
 		t.Helper()
