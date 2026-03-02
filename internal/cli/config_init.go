@@ -90,6 +90,10 @@ func runProjectInit(cmd *cobra.Command, hatenaID, blogID string) error {
 	return nil
 }
 
+// promptConfigWithScanner reads config fields interactively.
+// For project configs, any field may be left empty (empty Enter skips the field, which is
+// then omitted from the YAML file via omitempty so the global config takes precedence).
+// For global configs, the caller is responsible for calling config.Validate after this returns.
 func promptConfigWithScanner(cmd *cobra.Command, scanner *bufio.Scanner, hatenaID, blogID string) (*config.Config, error) {
 	cfg := &config.Config{}
 

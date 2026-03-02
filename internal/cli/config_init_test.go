@@ -100,6 +100,10 @@ func TestConfigInit_Project_Creates(t *testing.T) {
 			t.Errorf("expected %s not to appear in config, got:\n%s", field, content)
 		}
 	}
+	// All fields omitted: yaml.Marshal writes "{}\n" for an empty struct with omitempty tags.
+	if strings.TrimSpace(content) != "{}" {
+		t.Errorf("expected config to contain only {}, got:\n%s", content)
+	}
 }
 
 // TestConfigInit_Project_OverwriteYes verifies that an existing project config is overwritten when user confirms.
