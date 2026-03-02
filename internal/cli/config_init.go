@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/hirano00o/hb/config"
@@ -13,38 +14,83 @@ import (
 
 func newConfigInitCmd() *cobra.Command {
 	var hatenaID, blogID string
+	var global bool
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize the global hb configuration (~/.config/hb/config.yaml)",
+		Short: "Initialize hb configuration (project-local by default, global with -g)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := promptConfig(cmd, hatenaID, blogID)
-			if err != nil {
-				return err
+			if global {
+				return runGlobalInit(cmd, hatenaID, blogID)
 			}
-			if err := config.Validate(cfg); err != nil {
-				return err
-			}
-			path, err := config.GlobalConfigPath()
-			if err != nil {
-				return err
-			}
-			if err := config.Save(path, cfg); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Global config saved to %s\n", path)
-			return nil
+			return runProjectInit(cmd)
 		},
 	}
 
 	cmd.Flags().StringVar(&hatenaID, "hatena-id", "", "Hatena ID")
 	cmd.Flags().StringVar(&blogID, "blog-id", "", "Blog ID (e.g. example.hateblo.jp)")
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "Initialize the global config (~/.config/hb/config.yaml)")
 
 	return cmd
 }
 
-func promptConfig(cmd *cobra.Command, hatenaID, blogID string) (*config.Config, error) {
+func runGlobalInit(cmd *cobra.Command, hatenaID, blogID string) error {
+	path, err := config.GlobalConfigPath()
+	if err != nil {
+		return err
+	}
+	// Use a single scanner for all stdin reads to avoid buffering issues.
 	scanner := bufio.NewScanner(cmd.InOrStdin())
+	if _, err := os.Stat(path); err == nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s already exists. Overwrite? [y/N]: ", path)
+		if !scanner.Scan() {
+			return scanner.Err()
+		}
+		if !strings.EqualFold(strings.TrimSpace(scanner.Text()), "y") {
+			fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+			return nil
+		}
+	}
+	cfg, err := promptConfigWithScanner(cmd, scanner, hatenaID, blogID)
+	if err != nil {
+		return err
+	}
+	if err := config.Validate(cfg); err != nil {
+		return err
+	}
+	if err := config.Save(path, cfg); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Global config saved to %s\n", path)
+	return nil
+}
+
+func runProjectInit(cmd *cobra.Command) error {
+	const projectConfigFile = ".hb/config.yaml"
+	if _, err := os.Stat(projectConfigFile); err == nil {
+		ok, err := confirmAction(cmd, fmt.Sprintf("%s already exists. Overwrite? [y/N]: ", projectConfigFile))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+			return nil
+		}
+	}
+	cfg := &config.Config{}
+	if err := config.Save(projectConfigFile, cfg); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Project config created at %s\n", projectConfigFile)
+	fmt.Fprintln(cmd.OutOrStdout(), "Edit it to override global settings for this project.")
+	return nil
+}
+
+func promptConfig(cmd *cobra.Command, hatenaID, blogID string) (*config.Config, error) {
+	return promptConfigWithScanner(cmd, bufio.NewScanner(cmd.InOrStdin()), hatenaID, blogID)
+}
+
+func promptConfigWithScanner(cmd *cobra.Command, scanner *bufio.Scanner, hatenaID, blogID string) (*config.Config, error) {
 	cfg := &config.Config{}
 
 	if hatenaID != "" {
