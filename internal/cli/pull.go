@@ -89,13 +89,12 @@ func newPullCmd() *cobra.Command {
 			}
 
 			var (
-				saved     atomic.Int64
+				saved      atomic.Int64
 				interactMu sync.Mutex
 			)
 
-			eg, egCtx := errgroup.WithContext(ctx)
+			var eg errgroup.Group
 			eg.SetLimit(concurrency)
-			_ = egCtx
 
 			for _, e := range toProcess {
 				e := e
@@ -104,20 +103,27 @@ func newPullCmd() *cobra.Command {
 					filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
 					path := filepath.Join(dir, filename)
 
+					// resolveConflict and the subsequent output are serialised together
+					// to prevent interleaved prompts and concurrent writes to cmd.Out.
 					interactMu.Lock()
 					destPath, skip, err := resolveConflict(cmd, path, force)
-					interactMu.Unlock()
 					if err != nil {
+						interactMu.Unlock()
 						return err
 					}
 					if skip {
 						fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
+						interactMu.Unlock()
 						return nil
 					}
+					interactMu.Unlock()
+
 					if err := article.Write(destPath, a); err != nil {
 						return err
 					}
+					interactMu.Lock()
 					fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
+					interactMu.Unlock()
 					saved.Add(1)
 					return nil
 				})

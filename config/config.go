@@ -140,8 +140,8 @@ func LoadMerged() (*Config, error) {
 	}
 	if v := os.Getenv("HB_CONCURRENCY"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			return nil, fmt.Errorf("HB_CONCURRENCY must be a non-negative integer, got %q", v)
+		if err != nil || n <= 0 {
+			return nil, fmt.Errorf("HB_CONCURRENCY must be a positive integer, got %q", v)
 		}
 		merged.Concurrency = n
 	}

@@ -291,20 +291,36 @@ func TestLoadMerged_ConcurrencyEnvOverride(t *testing.T) {
 }
 
 func TestLoadMerged_ConcurrencyEnvInvalid(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	if err := os.MkdirAll(filepath.Join(dir, "hb"), 0o755); err != nil {
-		t.Fatal(err)
+	setupGlobalConfig := func(t *testing.T) {
+		t.Helper()
+		dir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", dir)
+		if err := os.MkdirAll(filepath.Join(dir, "hb"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "hb", "config.yaml"),
+			[]byte("hatena_id: u\nblog_id: b\napi_key: k\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Chdir(t.TempDir())
 	}
-	if err := os.WriteFile(filepath.Join(dir, "hb", "config.yaml"),
-		[]byte("hatena_id: u\nblog_id: b\napi_key: k\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(t.TempDir())
 
-	t.Setenv("HB_CONCURRENCY", "invalid")
-	_, err := config.LoadMerged()
-	if err == nil {
-		t.Fatal("expected error for invalid HB_CONCURRENCY")
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"non-integer", "invalid"},
+		{"zero", "0"},
+		{"negative", "-1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupGlobalConfig(t)
+			t.Setenv("HB_CONCURRENCY", tt.value)
+			_, err := config.LoadMerged()
+			if err == nil {
+				t.Fatalf("expected error for HB_CONCURRENCY=%q", tt.value)
+			}
+		})
 	}
 }
