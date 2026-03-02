@@ -25,8 +25,13 @@ func newClientFromConfig() (*hatena.Client, error) {
 // confirmAction prints prompt and reads a y/Y response from stdin.
 // Returns true when the user confirms, false otherwise (including EOF).
 func confirmAction(cmd *cobra.Command, prompt string) (bool, error) {
+	return confirmActionWithScanner(cmd, bufio.NewScanner(cmd.InOrStdin()), prompt)
+}
+
+// confirmActionWithScanner is like confirmAction but uses a caller-provided scanner,
+// allowing multiple stdin reads to share the same buffered scanner.
+func confirmActionWithScanner(cmd *cobra.Command, scanner *bufio.Scanner, prompt string) (bool, error) {
 	fmt.Fprint(cmd.OutOrStdout(), prompt)
-	scanner := bufio.NewScanner(cmd.InOrStdin())
 	if !scanner.Scan() {
 		return false, scanner.Err()
 	}
