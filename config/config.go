@@ -14,9 +14,9 @@ import (
 
 // Config holds the credentials and settings for Hatena Blog API access.
 type Config struct {
-	HatenaID    string `yaml:"hatena_id"`
-	BlogID      string `yaml:"blog_id"`
-	APIKey      string `yaml:"api_key"`
+	HatenaID    string `yaml:"hatena_id,omitempty"`
+	BlogID      string `yaml:"blog_id,omitempty"`
+	APIKey      string `yaml:"api_key,omitempty"`
 	Concurrency int    `yaml:"concurrency,omitempty"`
 }
 
