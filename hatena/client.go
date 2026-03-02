@@ -11,27 +11,34 @@ import (
 
 // Client is a Hatena Blog AtomPub API client.
 type Client struct {
-	hatenaID string
-	blogID   string
-	apiKey   string
-	baseURL  string
-	http     *http.Client
+	hatenaID    string
+	blogID      string
+	apiKey      string
+	baseURL     string
+	fotolifeURL string
+	http        *http.Client
 }
 
 // NewClient returns a Client configured for the given credentials.
 func NewClient(hatenaID, blogID, apiKey string) *Client {
 	return &Client{
-		hatenaID: hatenaID,
-		blogID:   blogID,
-		apiKey:   apiKey,
-		baseURL:  "https://blog.hatena.ne.jp",
-		http:     &http.Client{Timeout: 30 * time.Second},
+		hatenaID:    hatenaID,
+		blogID:      blogID,
+		apiKey:      apiKey,
+		baseURL:     "https://blog.hatena.ne.jp",
+		fotolifeURL: "https://f.hatena.ne.jp/atom/post",
+		http:        &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
 // SetBaseURL overrides the base URL, intended for testing.
 func (c *Client) SetBaseURL(url string) {
 	c.baseURL = url
+}
+
+// SetFotolifeURL overrides the Fotolife API endpoint, intended for testing.
+func (c *Client) SetFotolifeURL(url string) {
+	c.fotolifeURL = url
 }
 
 func (c *Client) collectionURL() string {

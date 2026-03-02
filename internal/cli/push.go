@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 
 	"github.com/hirano00o/hb/article"
@@ -48,9 +49,18 @@ func newPushCmd() *cobra.Command {
 				local.Frontmatter.Draft = draft
 			}
 
+			// Upload local images in the body, replacing them with hatena:syntax.
+			// The original local.Body is preserved; pushBody is used only for the API call.
+			pushBody, err := article.ReplaceLocalImages(ctx, local.Body, filepath.Dir(path), client.UploadImage)
+			if err != nil {
+				return fmt.Errorf("replace images: %w", err)
+			}
+			pushEntry := local.ToEntry()
+			pushEntry.Content = pushBody
+
 			// No editUrl → new entry, POST
 			if local.Frontmatter.EditURL == "" {
-				created, err := client.CreateEntry(ctx, local.ToEntry())
+				created, err := client.CreateEntry(ctx, pushEntry)
 				if err != nil {
 					return err
 				}
@@ -93,7 +103,7 @@ func newPushCmd() *cobra.Command {
 				}
 			}
 
-			updated, err := client.UpdateEntry(ctx, local.Frontmatter.EditURL, local.ToEntry())
+			updated, err := client.UpdateEntry(ctx, local.Frontmatter.EditURL, pushEntry)
 			if err != nil {
 				return err
 			}

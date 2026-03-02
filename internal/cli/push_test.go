@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -424,6 +425,96 @@ func writeEntryXMLFull(w http.ResponseWriter, title, content string, draft bool,
   <link rel="alternate" href="%s"/>
   <app:control><app:draft>%s</app:draft></app:control>
 </entry>`, title, content, editHref, alternateHref, draftStr)
+}
+
+// TestPush_LocalImage_Uploaded verifies that a local image in the article body is
+// uploaded to Fotolife and the body sent to the blog API contains the hatena:syntax value.
+func TestPush_LocalImage_Uploaded(t *testing.T) {
+	// Set up Fotolife mock server
+	fotolifeMux := http.NewServeMux()
+	fotolifeMux.HandleFunc("/atom/post", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://purl.org/atom/ns#" xmlns:hatena="http://www.hatena.ne.jp/info/xmlns#">
+  <title>photo.jpg</title>
+  <hatena:syntax>[f:id:user:20260303120000j:image]</hatena:syntax>
+</entry>`))
+	})
+	fotolifeSrv := httptest.NewServer(fotolifeMux)
+	t.Cleanup(fotolifeSrv.Close)
+
+	// Set up Blog API mock server
+	var receivedBody []byte
+	blogMux := http.NewServeMux()
+	blogMux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>Image Article</title>
+  <content type="text/x-markdown">[f:id:user:20260303120000j:image]
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/10"/>
+  <link rel="alternate" href="https://example.com/entry/10"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, r.Host)
+	})
+	blogSrv := httptest.NewServer(blogMux)
+	t.Cleanup(blogSrv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	fm := article.Frontmatter{
+		Title: "Image Article",
+		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft: false,
+	}
+	path, _ := setupPushTest(t, "", fm, "![alt](photo.jpg)\n")
+	// Place the image in the same directory as the article file.
+	imgPath := filepath.Join(filepath.Dir(path), "photo.jpg")
+	if err := os.WriteFile(imgPath, []byte{0xFF, 0xD8, 0xFF}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(blogSrv.URL)
+	c.SetFotolifeURL(fotolifeSrv.URL + "/atom/post")
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	if !strings.Contains(string(receivedBody), "[f:id:user:20260303120000j:image]") {
+		t.Errorf("expected hatena:syntax in POST body, got: %s", receivedBody)
+	}
+
+	// Verify the local file still contains the original image reference (not rewritten)
+	updated, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read updated file: %v", err)
+	}
+	if !strings.Contains(updated.Body, "photo.jpg") {
+		t.Errorf("expected original body preserved in local file, got: %s", updated.Body)
+	}
 }
 
 // writeEntryXML writes a minimal Atom entry XML to w.
