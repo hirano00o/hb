@@ -46,12 +46,58 @@ func TestListEntries_Pagination(t *testing.T) {
 	})
 
 	c := newTestClient(t, mux)
-	entries, err := c.ListEntries(context.Background())
+	entries, err := c.ListEntries(context.Background(), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(entries) != 2 {
 		t.Errorf("expected 2 entries, got %d", len(entries))
+	}
+}
+
+func TestListEntries_MaxPages(t *testing.T) {
+	// feedPage builds a feed XML using the request's host so the next-page URL
+	// is determined at request time, avoiding any variable-before-assignment race.
+	feedPage := func(r *http.Request, entryID, entryTitle, nextQuery string) string {
+		base := "http://" + r.Host
+		nextLink := ""
+		if nextQuery != "" {
+			nextLink = `<link rel="next" href="` + base + `/user/example.hateblo.jp/atom/entry?` + nextQuery + `"/>`
+		}
+		return `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  ` + nextLink + `
+  <entry>
+    <link rel="edit" href="` + base + `/user/example.hateblo.jp/atom/entry/` + entryID + `"/>
+    <title>` + entryTitle + `</title>
+    <updated>2026-03-01T12:00:00+09:00</updated>
+    <published>2026-03-01T12:00:00+09:00</published>
+    <content type="text/x-markdown">body</content>
+    <app:control><app:draft>no</app:draft></app:control>
+  </entry>
+</feed>`
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.RawQuery {
+		case "page=2":
+			w.Write([]byte(feedPage(r, "2", "Entry Two", "page=3")))
+		case "page=3":
+			w.Write([]byte(feedPage(r, "3", "Entry Three", "")))
+		default:
+			w.Write([]byte(feedPage(r, "1", "Entry One", "page=2")))
+		}
+	})
+
+	c := newTestClient(t, mux)
+
+	entries, err := c.ListEntries(context.Background(), 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("expected 2 entries (maxPages=2), got %d", len(entries))
 	}
 }
 

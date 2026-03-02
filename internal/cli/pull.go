@@ -30,8 +30,6 @@ func newPullCmd() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull all remote entries to local Markdown files",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-
 			var from, to time.Time
 			if fromStr != "" {
 				t, err := parseFilterDate(fromStr)
@@ -55,85 +53,17 @@ func newPullCmd() *cobra.Command {
 			if err := config.Validate(cfg); err != nil {
 				return fmt.Errorf("config: %w", err)
 			}
-			concurrency := cfg.Concurrency
-			if concurrency <= 0 {
-				concurrency = defaultConcurrency
+			concurrency := defaultConcurrency
+			if cfg.Concurrency != nil && *cfg.Concurrency > 0 {
+				concurrency = *cfg.Concurrency
+			}
+			maxPages := 0
+			if cfg.MaxPages != nil {
+				maxPages = *cfg.MaxPages
 			}
 
 			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
-			entries, err := client.ListEntries(ctx)
-			if err != nil {
-				return err
-			}
-
-			entries = filterEntriesByDate(entries, from, to)
-
-			// Build a set of known editUrls from local files to skip already-fetched entries.
-			knownEditURLs := map[string]struct{}{}
-			if !force {
-				knownEditURLs, err = collectLocalEditURLs(dir, cmd.ErrOrStderr())
-				if err != nil {
-					return err
-				}
-			}
-
-			// Filter out already-known entries before parallel processing.
-			toProcess := make([]*hatena.Entry, 0, len(entries))
-			for _, e := range entries {
-				if !force {
-					if _, exists := knownEditURLs[e.EditURL]; exists {
-						continue
-					}
-				}
-				toProcess = append(toProcess, e)
-			}
-
-			var (
-				saved      atomic.Int64
-				interactMu sync.Mutex
-			)
-
-			var eg errgroup.Group
-			eg.SetLimit(concurrency)
-
-			for _, e := range toProcess {
-				e := e
-				eg.Go(func() error {
-					a := article.FromEntry(e)
-					filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
-					path := filepath.Join(dir, filename)
-
-					// resolveConflict and the subsequent output are serialised together
-					// to prevent interleaved prompts and concurrent writes to cmd.Out.
-					interactMu.Lock()
-					destPath, skip, err := resolveConflict(cmd, path, force)
-					if err != nil {
-						interactMu.Unlock()
-						return err
-					}
-					if skip {
-						fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
-						interactMu.Unlock()
-						return nil
-					}
-					interactMu.Unlock()
-
-					if err := article.Write(destPath, a); err != nil {
-						return err
-					}
-					interactMu.Lock()
-					fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
-					interactMu.Unlock()
-					saved.Add(1)
-					return nil
-				})
-			}
-
-			if err := eg.Wait(); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%d entries saved.\n", saved.Load())
-			return nil
+			return runPull(cmd, client, dir, force, from, to, concurrency, maxPages)
 		},
 	}
 
@@ -142,6 +72,84 @@ func newPullCmd() *cobra.Command {
 	cmd.Flags().StringVar(&fromStr, "from", "", "Filter entries published on or after this date (YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd)")
 	cmd.Flags().StringVar(&toStr, "to", "", "Filter entries published on or before this date (YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd)")
 	return cmd
+}
+
+func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, from, to time.Time, concurrency, maxPages int) error {
+	ctx := cmd.Context()
+
+	entries, err := client.ListEntries(ctx, maxPages)
+	if err != nil {
+		return err
+	}
+
+	entries = filterEntriesByDate(entries, from, to)
+
+	// Build a set of known editUrls from local files to skip already-fetched entries.
+	knownEditURLs := map[string]struct{}{}
+	if !force {
+		knownEditURLs, err = collectLocalEditURLs(dir, cmd.ErrOrStderr())
+		if err != nil {
+			return err
+		}
+	}
+
+	// Filter out already-known entries before parallel processing.
+	toProcess := make([]*hatena.Entry, 0, len(entries))
+	for _, e := range entries {
+		if !force {
+			if _, exists := knownEditURLs[e.EditURL]; exists {
+				continue
+			}
+		}
+		toProcess = append(toProcess, e)
+	}
+
+	var (
+		saved      atomic.Int64
+		interactMu sync.Mutex
+	)
+
+	var eg errgroup.Group
+	eg.SetLimit(concurrency)
+
+	for _, e := range toProcess {
+		e := e
+		eg.Go(func() error {
+			a := article.FromEntry(e)
+			filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
+			path := filepath.Join(dir, filename)
+
+			// resolveConflict and the subsequent output are serialised together
+			// to prevent interleaved prompts and concurrent writes to cmd.Out.
+			interactMu.Lock()
+			destPath, skip, err := resolveConflict(cmd, path, force)
+			if err != nil {
+				interactMu.Unlock()
+				return err
+			}
+			if skip {
+				fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
+				interactMu.Unlock()
+				return nil
+			}
+			interactMu.Unlock()
+
+			if err := article.Write(destPath, a); err != nil {
+				return err
+			}
+			interactMu.Lock()
+			fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
+			interactMu.Unlock()
+			saved.Add(1)
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "%d entries saved.\n", saved.Load())
+	return nil
 }
 
 // parseFilterDate parses a date string in YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd format.
