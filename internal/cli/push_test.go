@@ -35,6 +35,86 @@ func setupPushTest(t *testing.T, editURL string, fm article.Frontmatter, body st
 	return p, func() {}
 }
 
+// stubClient replaces newClientFromConfig with a function that returns c, restoring the original on cleanup.
+func stubClient(t *testing.T, c *hatena.Client) {
+	t.Helper()
+	orig := newClientFromConfig
+	t.Cleanup(func() { newClientFromConfig = orig })
+	newClientFromConfig = func() (*hatena.Client, error) { return c, nil }
+}
+
+// TestPush_NewEntry_Create verifies that a file with no editUrl triggers a POST and
+// updates the local file with the assigned editUrl and url.
+func TestPush_NewEntry_Create(t *testing.T) {
+	postCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		postCalled = true
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>New Entry</title>
+  <content type="text/x-markdown">new body
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/99"/>
+  <link rel="alternate" href="https://example.com/entry/99"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, r.Host)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	fm := article.Frontmatter{
+		Title: "New Entry",
+		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft: false,
+		// EditURL is empty → triggers POST
+	}
+	path, _ := setupPushTest(t, "", fm, "new body\n")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	if !postCalled {
+		t.Fatal("expected POST request for new entry")
+	}
+	if !strings.Contains(out.String(), "Created:") {
+		t.Errorf("expected 'Created:' in output, got: %s", out.String())
+	}
+
+	// Verify the file was updated with editUrl and url.
+	updated, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read updated file: %v", err)
+	}
+	if updated.Frontmatter.EditURL == "" {
+		t.Error("expected EditURL to be set after create")
+	}
+	if updated.Frontmatter.URL == "" {
+		t.Error("expected URL to be set after create")
+	}
+}
+
 // TestPush_Draft_FlagOverridesFrontmatter verifies that --draft overrides frontmatter draft=false
 // and that the request body contains app:draft yes.
 func TestPush_Draft_FlagOverridesFrontmatter(t *testing.T) {
@@ -325,6 +405,25 @@ func TestPush_DiffDirection_LocalAsFrom(t *testing.T) {
 	if plusIdx < 0 {
 		t.Errorf("expected '+remote body' in diff output, got:\n%s", diffOut)
 	}
+}
+
+// writeEntryXMLFull writes a minimal Atom entry XML to w with explicit edit and alternate hrefs.
+func writeEntryXMLFull(w http.ResponseWriter, title, content string, draft bool, editHref, alternateHref string) {
+	draftStr := "no"
+	if draft {
+		draftStr = "yes"
+	}
+	w.Header().Set("Content-Type", "application/atom+xml")
+	fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>%s</title>
+  <content type="text/x-markdown">%s</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s"/>
+  <link rel="alternate" href="%s"/>
+  <app:control><app:draft>%s</app:draft></app:control>
+</entry>`, title, content, editHref, alternateHref, draftStr)
 }
 
 // writeEntryXML writes a minimal Atom entry XML to w.
