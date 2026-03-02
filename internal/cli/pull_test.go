@@ -124,7 +124,8 @@ func TestFilterEntriesByDate(t *testing.T) {
 }
 
 // buildFeedXML generates a minimal Atom feed XML with the given entries and optional next-page URL.
-func buildFeedXML(srvURL string, entries []struct{ id, title, editURL string }, nextURL string) string {
+// base is the scheme+host of the test server (e.g. "http://127.0.0.1:PORT"), derived from r.Host at request time.
+func buildFeedXML(base string, entries []struct{ id, title string }, nextURL string) string {
 	var sb strings.Builder
 	sb.WriteString(`<?xml version="1.0" encoding="utf-8"?>` + "\n")
 	sb.WriteString(`<feed xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">` + "\n")
@@ -133,7 +134,7 @@ func buildFeedXML(srvURL string, entries []struct{ id, title, editURL string }, 
 	}
 	for _, e := range entries {
 		sb.WriteString(`  <entry>` + "\n")
-		sb.WriteString(`    <link rel="edit" href="` + srvURL + `/user/blog/atom/entry/` + e.id + `"/>` + "\n")
+		sb.WriteString(`    <link rel="edit" href="` + base + `/user/blog/atom/entry/` + e.id + `"/>` + "\n")
 		sb.WriteString(`    <title>` + e.title + `</title>` + "\n")
 		sb.WriteString(`    <updated>2026-03-01T12:00:00+09:00</updated>` + "\n")
 		sb.WriteString(`    <published>2026-03-01T12:00:00+09:00</published>` + "\n")
@@ -157,14 +158,10 @@ func newTestPullCmd(t *testing.T) (*cobra.Command, *bytes.Buffer) {
 }
 
 func TestRunPull_Integration(t *testing.T) {
-	type testEntry struct {
-		id, title, editURL string
-	}
-
 	tests := []struct {
 		name        string
-		setupServer func(t *testing.T, srvURL *string) *http.ServeMux
-		setupDir    func(t *testing.T, dir string, srvURL *string)
+		setupServer func(t *testing.T) *http.ServeMux
+		setupDir    func(t *testing.T, dir, srvURL string)
 		force       bool
 		concurrency int
 		maxPages    int
@@ -172,15 +169,12 @@ func TestRunPull_Integration(t *testing.T) {
 	}{
 		{
 			name: "basic: multiple entries parallel download",
-			setupServer: func(t *testing.T, srvURL *string) *http.ServeMux {
+			setupServer: func(t *testing.T) *http.ServeMux {
 				mux := http.NewServeMux()
 				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
-					entries := []struct{ id, title, editURL string }{
-						{"1", "Alpha", ""},
-						{"2", "Beta", ""},
-						{"3", "Gamma", ""},
-					}
-					w.Write([]byte(buildFeedXML(*srvURL, entries, "")))
+					base := "http://" + r.Host
+					entries := []struct{ id, title string }{{"1", "Alpha"}, {"2", "Beta"}, {"3", "Gamma"}}
+					w.Write([]byte(buildFeedXML(base, entries, "")))
 				})
 				return mux
 			},
@@ -190,20 +184,15 @@ func TestRunPull_Integration(t *testing.T) {
 		},
 		{
 			name: "pagination: two pages of entries",
-			setupServer: func(t *testing.T, srvURL *string) *http.ServeMux {
+			setupServer: func(t *testing.T) *http.ServeMux {
 				mux := http.NewServeMux()
 				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+					base := "http://" + r.Host
 					if r.URL.RawQuery == "page=2" {
-						entries := []struct{ id, title, editURL string }{
-							{"2", "Page2Entry", ""},
-						}
-						w.Write([]byte(buildFeedXML(*srvURL, entries, "")))
+						w.Write([]byte(buildFeedXML(base, []struct{ id, title string }{{"2", "Page2Entry"}}, "")))
 						return
 					}
-					entries := []struct{ id, title, editURL string }{
-						{"1", "Page1Entry", ""},
-					}
-					w.Write([]byte(buildFeedXML(*srvURL, entries, (*srvURL)+"/user/blog/atom/entry?page=2")))
+					w.Write([]byte(buildFeedXML(base, []struct{ id, title string }{{"1", "Page1Entry"}}, base+"/user/blog/atom/entry?page=2")))
 				})
 				return mux
 			},
@@ -213,20 +202,18 @@ func TestRunPull_Integration(t *testing.T) {
 		},
 		{
 			name: "skip existing entries by editURL",
-			setupServer: func(t *testing.T, srvURL *string) *http.ServeMux {
+			setupServer: func(t *testing.T) *http.ServeMux {
 				mux := http.NewServeMux()
 				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
-					entries := []struct{ id, title, editURL string }{
-						{"1", "ExistingEntry", ""},
-						{"2", "NewEntry", ""},
-					}
-					w.Write([]byte(buildFeedXML(*srvURL, entries, "")))
+					base := "http://" + r.Host
+					entries := []struct{ id, title string }{{"1", "ExistingEntry"}, {"2", "NewEntry"}}
+					w.Write([]byte(buildFeedXML(base, entries, "")))
 				})
 				return mux
 			},
-			setupDir: func(t *testing.T, dir string, srvURL *string) {
+			setupDir: func(t *testing.T, dir, srvURL string) {
 				// Write a .md file with the editURL of entry 1 in its frontmatter.
-				editURL := (*srvURL) + "/user/blog/atom/entry/1"
+				editURL := srvURL + "/user/blog/atom/entry/1"
 				content := "---\ntitle: ExistingEntry\ndate: 2026-03-01T12:00:00+09:00\ndraft: false\neditUrl: " + editURL + "\n---\nold body\n"
 				if err := os.WriteFile(filepath.Join(dir, "existing.md"), []byte(content), 0o644); err != nil {
 					t.Fatal(err)
@@ -238,17 +225,15 @@ func TestRunPull_Integration(t *testing.T) {
 		},
 		{
 			name: "force=true: auto-rename on filename collision",
-			setupServer: func(t *testing.T, srvURL *string) *http.ServeMux {
+			setupServer: func(t *testing.T) *http.ServeMux {
 				mux := http.NewServeMux()
 				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
-					entries := []struct{ id, title, editURL string }{
-						{"1", "SameTitle", ""},
-					}
-					w.Write([]byte(buildFeedXML(*srvURL, entries, "")))
+					base := "http://" + r.Host
+					w.Write([]byte(buildFeedXML(base, []struct{ id, title string }{{"1", "SameTitle"}}, "")))
 				})
 				return mux
 			},
-			setupDir: func(t *testing.T, dir string, srvURL *string) {
+			setupDir: func(t *testing.T, dir, _ string) {
 				// Pre-place a file with the same generated name.
 				if err := os.WriteFile(filepath.Join(dir, "20260301_SameTitle.md"), []byte("old"), 0o644); err != nil {
 					t.Fatal(err)
@@ -260,19 +245,17 @@ func TestRunPull_Integration(t *testing.T) {
 		},
 		{
 			name: "maxPages limits pagination",
-			setupServer: func(t *testing.T, srvURL *string) *http.ServeMux {
+			setupServer: func(t *testing.T) *http.ServeMux {
 				mux := http.NewServeMux()
 				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+					base := "http://" + r.Host
 					switch r.URL.RawQuery {
 					case "page=2":
-						entries := []struct{ id, title, editURL string }{{"2", "Page2Entry", ""}}
-						w.Write([]byte(buildFeedXML(*srvURL, entries, (*srvURL)+"/user/blog/atom/entry?page=3")))
+						w.Write([]byte(buildFeedXML(base, []struct{ id, title string }{{"2", "Page2Entry"}}, base+"/user/blog/atom/entry?page=3")))
 					case "page=3":
-						entries := []struct{ id, title, editURL string }{{"3", "Page3Entry", ""}}
-						w.Write([]byte(buildFeedXML(*srvURL, entries, "")))
+						w.Write([]byte(buildFeedXML(base, []struct{ id, title string }{{"3", "Page3Entry"}}, "")))
 					default:
-						entries := []struct{ id, title, editURL string }{{"1", "Page1Entry", ""}}
-						w.Write([]byte(buildFeedXML(*srvURL, entries, (*srvURL)+"/user/blog/atom/entry?page=2")))
+						w.Write([]byte(buildFeedXML(base, []struct{ id, title string }{{"1", "Page1Entry"}}, base+"/user/blog/atom/entry?page=2")))
 					}
 				})
 				return mux
@@ -282,20 +265,32 @@ func TestRunPull_Integration(t *testing.T) {
 			maxPages:    1,
 			wantFiles:   1, // only page 1
 		},
+		{
+			name: "concurrency=1 serialises downloads",
+			setupServer: func(t *testing.T) *http.ServeMux {
+				mux := http.NewServeMux()
+				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+					base := "http://" + r.Host
+					entries := []struct{ id, title string }{{"1", "Alpha"}, {"2", "Beta"}}
+					w.Write([]byte(buildFeedXML(base, entries, "")))
+				})
+				return mux
+			},
+			force:       true,
+			concurrency: 1, // serialise: only one goroutine at a time
+			wantFiles:   2,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
-			var srvURL string
 
-			mux := tt.setupServer(t, &srvURL)
-			srv := httptest.NewServer(mux)
+			srv := httptest.NewServer(tt.setupServer(t))
 			t.Cleanup(srv.Close)
-			srvURL = srv.URL
 
 			if tt.setupDir != nil {
-				tt.setupDir(t, dir, &srvURL)
+				tt.setupDir(t, dir, srv.URL)
 			}
 
 			c := hatena.NewClient("user", "blog", "key")
@@ -306,16 +301,16 @@ func TestRunPull_Integration(t *testing.T) {
 				t.Fatalf("runPull error: %v", err)
 			}
 
-			entries, err := os.ReadDir(dir)
+			files, err := os.ReadDir(dir)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(entries) != tt.wantFiles {
-				names := make([]string, 0, len(entries))
-				for _, e := range entries {
-					names = append(names, e.Name())
+			if len(files) != tt.wantFiles {
+				names := make([]string, 0, len(files))
+				for _, f := range files {
+					names = append(names, f.Name())
 				}
-				t.Errorf("got %d files %v, want %d", len(entries), names, tt.wantFiles)
+				t.Errorf("got %d files %v, want %d", len(files), names, tt.wantFiles)
 			}
 		})
 	}

@@ -53,13 +53,17 @@ func newPullCmd() *cobra.Command {
 			if err := config.Validate(cfg); err != nil {
 				return fmt.Errorf("config: %w", err)
 			}
-			concurrency := cfg.Concurrency
-			if concurrency <= 0 {
-				concurrency = defaultConcurrency
+			concurrency := defaultConcurrency
+			if cfg.Concurrency != nil && *cfg.Concurrency > 0 {
+				concurrency = *cfg.Concurrency
+			}
+			maxPages := 0
+			if cfg.MaxPages != nil {
+				maxPages = *cfg.MaxPages
 			}
 
 			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
-			return runPull(cmd, client, dir, force, from, to, concurrency, cfg.MaxPages)
+			return runPull(cmd, client, dir, force, from, to, concurrency, maxPages)
 		},
 	}
 

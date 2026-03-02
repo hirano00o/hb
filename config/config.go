@@ -17,8 +17,8 @@ type Config struct {
 	HatenaID    string `yaml:"hatena_id,omitempty"`
 	BlogID      string `yaml:"blog_id,omitempty"`
 	APIKey      string `yaml:"api_key,omitempty"`
-	Concurrency int    `yaml:"concurrency,omitempty"`
-	MaxPages    int    `yaml:"max_pages,omitempty"`
+	Concurrency *int   `yaml:"concurrency,omitempty"`
+	MaxPages    *int   `yaml:"max_pages,omitempty"`
 }
 
 // GlobalConfigPath returns the path to the global config file.
@@ -95,10 +95,10 @@ func Merge(global, project *Config) *Config {
 	if project.APIKey != "" {
 		merged.APIKey = project.APIKey
 	}
-	if project.Concurrency != 0 {
+	if project.Concurrency != nil {
 		merged.Concurrency = project.Concurrency
 	}
-	if project.MaxPages != 0 {
+	if project.MaxPages != nil {
 		merged.MaxPages = project.MaxPages
 	}
 	return &merged
@@ -147,14 +147,14 @@ func LoadMerged() (*Config, error) {
 		if err != nil || n <= 0 {
 			return nil, fmt.Errorf("HB_CONCURRENCY must be a positive integer, got %q", v)
 		}
-		merged.Concurrency = n
+		merged.Concurrency = &n
 	}
 	if v := os.Getenv("HB_MAX_PAGES"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
 			return nil, fmt.Errorf("HB_MAX_PAGES must be a non-negative integer, got %q", v)
 		}
-		merged.MaxPages = n
+		merged.MaxPages = &n
 	}
 	return merged, nil
 }

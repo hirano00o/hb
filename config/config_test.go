@@ -74,19 +74,29 @@ func TestMerge(t *testing.T) {
 	}
 }
 
+func intPtr(v int) *int { return &v }
+
 func TestMerge_Concurrency(t *testing.T) {
-	global := &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", Concurrency: 3}
-	project := &config.Config{Concurrency: 10}
+	global := &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", Concurrency: intPtr(3)}
+	project := &config.Config{Concurrency: intPtr(10)}
 	merged := config.Merge(global, project)
-	if merged.Concurrency != 10 {
-		t.Errorf("Concurrency should be overridden by project, got %d", merged.Concurrency)
+	if merged.Concurrency == nil || *merged.Concurrency != 10 {
+		t.Errorf("Concurrency should be overridden by project, got %v", merged.Concurrency)
 	}
 
-	// Zero in project must not override global.
+	// nil in project must not override global.
 	project2 := &config.Config{}
 	merged2 := config.Merge(global, project2)
-	if merged2.Concurrency != 3 {
-		t.Errorf("Concurrency should be kept from global when project is 0, got %d", merged2.Concurrency)
+	if merged2.Concurrency == nil || *merged2.Concurrency != 3 {
+		t.Errorf("Concurrency should be kept from global when project is nil, got %v", merged2.Concurrency)
+	}
+
+	// Zero in project must override global (explicitly set to 0 is meaningful for MaxPages,
+	// but Concurrency=0 means "use default", so this tests that nil is the sentinel for unset).
+	project3 := &config.Config{Concurrency: intPtr(0)}
+	merged3 := config.Merge(global, project3)
+	if merged3.Concurrency == nil || *merged3.Concurrency != 0 {
+		t.Errorf("Concurrency should be overridden to 0 when project explicitly sets it, got %v", merged3.Concurrency)
 	}
 }
 
@@ -285,24 +295,31 @@ func TestLoadMerged_ConcurrencyEnvOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Concurrency != 8 {
-		t.Errorf("Concurrency should be 8 from env, got %d", cfg.Concurrency)
+	if cfg.Concurrency == nil || *cfg.Concurrency != 8 {
+		t.Errorf("Concurrency should be 8 from env, got %v", cfg.Concurrency)
 	}
 }
 
 func TestMerge_MaxPages(t *testing.T) {
-	global := &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", MaxPages: 3}
-	project := &config.Config{MaxPages: 10}
+	global := &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", MaxPages: intPtr(3)}
+	project := &config.Config{MaxPages: intPtr(10)}
 	merged := config.Merge(global, project)
-	if merged.MaxPages != 10 {
-		t.Errorf("MaxPages should be overridden by project, got %d", merged.MaxPages)
+	if merged.MaxPages == nil || *merged.MaxPages != 10 {
+		t.Errorf("MaxPages should be overridden by project, got %v", merged.MaxPages)
 	}
 
-	// Zero in project must not override global.
+	// nil in project must not override global.
 	project2 := &config.Config{}
 	merged2 := config.Merge(global, project2)
-	if merged2.MaxPages != 3 {
-		t.Errorf("MaxPages should be kept from global when project is 0, got %d", merged2.MaxPages)
+	if merged2.MaxPages == nil || *merged2.MaxPages != 3 {
+		t.Errorf("MaxPages should be kept from global when project is nil, got %v", merged2.MaxPages)
+	}
+
+	// Zero in project must override global (0 = no limit).
+	project3 := &config.Config{MaxPages: intPtr(0)}
+	merged3 := config.Merge(global, project3)
+	if merged3.MaxPages == nil || *merged3.MaxPages != 0 {
+		t.Errorf("MaxPages should be overridden to 0 when project explicitly sets it, got %v", merged3.MaxPages)
 	}
 }
 
@@ -324,8 +341,8 @@ func TestLoadMerged_MaxPagesEnvOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.MaxPages != 5 {
-		t.Errorf("MaxPages should be 5 from env, got %d", cfg.MaxPages)
+	if cfg.MaxPages == nil || *cfg.MaxPages != 5 {
+		t.Errorf("MaxPages should be 5 from env, got %v", cfg.MaxPages)
 	}
 }
 
@@ -348,8 +365,8 @@ func TestLoadMerged_MaxPagesEnvZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.MaxPages != 0 {
-		t.Errorf("MaxPages should be 0 from env, got %d", cfg.MaxPages)
+	if cfg.MaxPages == nil || *cfg.MaxPages != 0 {
+		t.Errorf("MaxPages should be 0 from env, got %v", cfg.MaxPages)
 	}
 }
 
