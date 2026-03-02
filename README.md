@@ -42,6 +42,7 @@ hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
 | `HB_HATENA_ID` | Hatena ID |
 | `HB_BLOG_ID` | Blog ID |
 | `HB_API_KEY` | API キー |
+| `HB_CONCURRENCY` | pull の並列実行数（デフォルト: 5） |
 
 ```sh
 export HB_API_KEY=your_api_key
@@ -66,11 +67,13 @@ hb init
 リモートの全記事をローカルのMarkdownファイルとして取得します。
 
 ```sh
-hb pull [--force|-f] [--dir <directory>]
+hb pull [--force|-f] [--dir <directory>] [--from <date>] [--to <date>]
 ```
 
 - `--force` / `-f`: ファイル名が衝突したときに確認なしで自動リネーム（連番suffix付与: `_1`, `_2`, …）
 - `--dir`: 保存先ディレクトリ（デフォルト: カレントディレクトリ）
+- `--from`: 指定日以降に投稿された記事のみ取得（形式: `YYYY-mm-dd`, `YYYY/mm/dd`, `YYYYmmdd`）
+- `--to`: 指定日以前に投稿された記事のみ取得（形式: `YYYY-mm-dd`, `YYYY/mm/dd`, `YYYYmmdd`）
 
 ファイル名が既存ファイルと衝突した場合（`--force` なし）:
 1. **カスタム名**を入力 → そのファイル名で保存
@@ -165,6 +168,15 @@ customUrlPath: my-custom-path
 ## 設定ファイルの優先度
 
 環境変数 > プロジェクト設定（`.hb/config.yaml`）> グローバル設定（`~/.config/hb/config.yaml`）
+
+### 設定ファイルの例
+
+```yaml
+hatena_id: yourhatenaId
+blog_id: yourblog.hateblo.jp
+api_key: your_api_key
+concurrency: 10  # pull の並列実行数（デフォルト: 5）
+```
 
 ## 開発
 

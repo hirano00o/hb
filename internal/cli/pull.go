@@ -2,33 +2,71 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/config"
+	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
+
+const defaultConcurrency = 5
 
 func newPullCmd() *cobra.Command {
 	var force bool
 	var dir string
+	var fromStr, toStr string
 
 	cmd := &cobra.Command{
 		Use:   "pull",
 		Short: "Pull all remote entries to local Markdown files",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			client, err := newClientFromConfig()
+
+			var from, to time.Time
+			if fromStr != "" {
+				t, err := parseFilterDate(fromStr)
+				if err != nil {
+					return fmt.Errorf("--from: %w", err)
+				}
+				from = t
+			}
+			if toStr != "" {
+				t, err := parseFilterDate(toStr)
+				if err != nil {
+					return fmt.Errorf("--to: %w", err)
+				}
+				to = t
+			}
+
+			cfg, err := config.LoadMerged()
 			if err != nil {
 				return err
 			}
+			if err := config.Validate(cfg); err != nil {
+				return fmt.Errorf("config: %w", err)
+			}
+			concurrency := cfg.Concurrency
+			if concurrency <= 0 {
+				concurrency = defaultConcurrency
+			}
+
+			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
 			entries, err := client.ListEntries(ctx)
 			if err != nil {
 				return err
 			}
+
+			entries = filterEntriesByDate(entries, from, to)
 
 			// Build a set of known editUrls from local files to skip already-fetched entries.
 			knownEditURLs := map[string]struct{}{}
@@ -39,39 +77,102 @@ func newPullCmd() *cobra.Command {
 				}
 			}
 
-			saved := 0
+			// Filter out already-known entries before parallel processing.
+			toProcess := make([]*hatena.Entry, 0, len(entries))
 			for _, e := range entries {
 				if !force {
 					if _, exists := knownEditURLs[e.EditURL]; exists {
 						continue
 					}
 				}
-				a := article.FromEntry(e)
-				filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
-				path := filepath.Join(dir, filename)
-
-				destPath, skip, err := resolveConflict(cmd, path, force)
-				if err != nil {
-					return err
-				}
-				if skip {
-					fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
-					continue
-				}
-				if err := article.Write(destPath, a); err != nil {
-					return err
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
-				saved++
+				toProcess = append(toProcess, e)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%d entries saved.\n", saved)
+
+			var (
+				saved      atomic.Int64
+				interactMu sync.Mutex
+			)
+
+			var eg errgroup.Group
+			eg.SetLimit(concurrency)
+
+			for _, e := range toProcess {
+				e := e
+				eg.Go(func() error {
+					a := article.FromEntry(e)
+					filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
+					path := filepath.Join(dir, filename)
+
+					// resolveConflict and the subsequent output are serialised together
+					// to prevent interleaved prompts and concurrent writes to cmd.Out.
+					interactMu.Lock()
+					destPath, skip, err := resolveConflict(cmd, path, force)
+					if err != nil {
+						interactMu.Unlock()
+						return err
+					}
+					if skip {
+						fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
+						interactMu.Unlock()
+						return nil
+					}
+					interactMu.Unlock()
+
+					if err := article.Write(destPath, a); err != nil {
+						return err
+					}
+					interactMu.Lock()
+					fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
+					interactMu.Unlock()
+					saved.Add(1)
+					return nil
+				})
+			}
+
+			if err := eg.Wait(); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "%d entries saved.\n", saved.Load())
 			return nil
 		},
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "On filename conflict, auto-rename with millisecond suffix instead of prompting")
 	cmd.Flags().StringVar(&dir, "dir", "", "Directory to save files (default: current directory)")
+	cmd.Flags().StringVar(&fromStr, "from", "", "Filter entries published on or after this date (YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd)")
+	cmd.Flags().StringVar(&toStr, "to", "", "Filter entries published on or before this date (YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd)")
 	return cmd
+}
+
+// parseFilterDate parses a date string in YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd format.
+// Comparison uses year/month/day only; time and timezone are ignored.
+func parseFilterDate(s string) (time.Time, error) {
+	for _, layout := range []string{"2006-01-02", "2006/01/02", "20060102"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), nil
+		}
+	}
+	return time.Time{}, errors.New("invalid date format: use YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd")
+}
+
+// filterEntriesByDate returns entries whose Date falls within [from, to] (inclusive).
+// Zero-value from or to means no lower/upper bound respectively.
+func filterEntriesByDate(entries []*hatena.Entry, from, to time.Time) []*hatena.Entry {
+	if from.IsZero() && to.IsZero() {
+		return entries
+	}
+	result := make([]*hatena.Entry, 0, len(entries))
+	for _, e := range entries {
+		d := time.Date(e.Date.Year(), e.Date.Month(), e.Date.Day(), 0, 0, 0, 0, time.UTC)
+		if !from.IsZero() && d.Before(from) {
+			continue
+		}
+		if !to.IsZero() && d.After(to) {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result
 }
 
 // resolveConflict checks if path already exists and, if so, determines the destination path.

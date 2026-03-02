@@ -76,7 +76,7 @@ func newPushCmd() *cobra.Command {
 				return nil
 			}
 
-			diff, err := unifiedDiff(path, remoteArticle, local)
+			diff, err := unifiedDiff(path, local, remoteArticle)
 			if err != nil {
 				return err
 			}
