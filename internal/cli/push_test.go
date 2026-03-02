@@ -517,6 +517,75 @@ func TestPush_LocalImage_Uploaded(t *testing.T) {
 	}
 }
 
+// TestPush_LocalImage_RePush_NoChanges verifies that pushing an article with a local image
+// a second time (when the remote already has the hatena:syntax) reports "No changes".
+// This guards against the bug where local.Body (with local paths) was compared to
+// remoteArticle.Body (with hatena:syntax), which always produces a false diff.
+func TestPush_LocalImage_RePush_NoChanges(t *testing.T) {
+	const syntax = "[f:id:user:20260303120000j:image]"
+
+	fotolifeMux := http.NewServeMux()
+	fotolifeMux.HandleFunc("/atom/post", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://purl.org/atom/ns#" xmlns:hatena="http://www.hatena.ne.jp/info/xmlns#">
+  <title>photo.jpg</title>
+  <hatena:syntax>%s</hatena:syntax>
+</entry>`, syntax)
+	})
+	fotolifeSrv := httptest.NewServer(fotolifeMux)
+	t.Cleanup(fotolifeSrv.Close)
+
+	blogMux := http.NewServeMux()
+	blogMux.HandleFunc("/user/example.hateblo.jp/atom/entry/20", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			editHref := fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/20", r.Host)
+			// Remote body already contains hatena:syntax from the first push.
+			writeEntryXMLFull(w, "Image Article", syntax+"\n", false, editHref, "https://example.com/entry/20")
+		} else {
+			t.Errorf("unexpected %s request: expected no re-upload", r.Method)
+		}
+	})
+	blogSrv := httptest.NewServer(blogMux)
+	t.Cleanup(blogSrv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := blogSrv.URL + "/user/example.hateblo.jp/atom/entry/20"
+	fm := article.Frontmatter{
+		Title:   "Image Article",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/20",
+	}
+	// Local file still contains the local image path (not replaced).
+	path, _ := setupPushTest(t, editURL, fm, "![alt](photo.jpg)\n")
+	imgPath := filepath.Join(filepath.Dir(path), "photo.jpg")
+	if err := os.WriteFile(imgPath, []byte{0xFF, 0xD8, 0xFF}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(blogSrv.URL)
+	c.SetFotolifeURL(fotolifeSrv.URL + "/atom/post")
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "No changes") {
+		t.Errorf("expected 'No changes' output on re-push, got: %s", out.String())
+	}
+}
+
 // writeEntryXML writes a minimal Atom entry XML to w.
 func writeEntryXML(w http.ResponseWriter, title, content string, draft bool) {
 	draftStr := "no"

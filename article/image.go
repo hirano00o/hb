@@ -11,12 +11,22 @@ import (
 // ImageUploader uploads an image file and returns the hatena:syntax value.
 type ImageUploader func(ctx context.Context, filePath string) (string, error)
 
-var imageRegexp = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+// imageRegexp matches Markdown image syntax including an optional title attribute:
+//
+//	![alt](path)
+//	![alt](path "title")
+var imageRegexp = regexp.MustCompile(`!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)`)
 
 // ReplaceLocalImages scans body for Markdown image references and replaces
 // local file paths (those not starting with http:// or https://) with the
 // hatena:syntax value returned by uploader. Remote URLs are left unchanged.
+// Paths that resolve outside baseDir (e.g. absolute paths or "../" escapes) are rejected.
 func ReplaceLocalImages(ctx context.Context, body, baseDir string, uploader ImageUploader) (string, error) {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve baseDir %s: %w", baseDir, err)
+	}
+
 	var rerr error
 	result := imageRegexp.ReplaceAllStringFunc(body, func(match string) string {
 		if rerr != nil {
@@ -30,7 +40,20 @@ func ReplaceLocalImages(ctx context.Context, body, baseDir string, uploader Imag
 		if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
 			return match
 		}
-		absPath := filepath.Join(baseDir, path)
+		// Reject absolute paths and paths that escape baseDir via "../".
+		if filepath.IsAbs(path) {
+			rerr = fmt.Errorf("image path %s must be relative", path)
+			return match
+		}
+		absPath, aerr := filepath.Abs(filepath.Join(absBase, path))
+		if aerr != nil {
+			rerr = fmt.Errorf("resolve image path %s: %w", path, aerr)
+			return match
+		}
+		if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) {
+			rerr = fmt.Errorf("image path %s is outside article directory", path)
+			return match
+		}
 		syntax, err := uploader(ctx, absPath)
 		if err != nil {
 			rerr = fmt.Errorf("upload image %s: %w", path, err)

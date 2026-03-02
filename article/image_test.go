@@ -106,3 +106,57 @@ func TestReplaceLocalImages_UploaderError(t *testing.T) {
 		t.Errorf("expected upload error, got %v", err)
 	}
 }
+
+func TestReplaceLocalImages_TitleAttribute(t *testing.T) {
+	dir := t.TempDir()
+	imgPath := filepath.Join(dir, "photo.jpg")
+	if err := os.WriteFile(imgPath, []byte("fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	uploader := func(_ context.Context, filePath string) (string, error) {
+		if filePath != imgPath {
+			t.Errorf("unexpected filePath: got %q, want %q", filePath, imgPath)
+		}
+		return "[f:id:user:20260303120000j:image]", nil
+	}
+
+	// Title attribute must not be included in the path.
+	body := `![alt](photo.jpg "My Title")` + "\n"
+	got, err := ReplaceLocalImages(context.Background(), body, dir, uploader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "[f:id:user:20260303120000j:image]\n"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestReplaceLocalImages_AbsolutePathRejected(t *testing.T) {
+	dir := t.TempDir()
+	uploader := func(_ context.Context, _ string) (string, error) {
+		t.Error("uploader must not be called for absolute paths")
+		return "", nil
+	}
+
+	body := "![alt](/etc/passwd)\n"
+	_, err := ReplaceLocalImages(context.Background(), body, dir, uploader)
+	if err == nil {
+		t.Fatal("expected error for absolute path, got nil")
+	}
+}
+
+func TestReplaceLocalImages_PathTraversalRejected(t *testing.T) {
+	dir := t.TempDir()
+	uploader := func(_ context.Context, _ string) (string, error) {
+		t.Error("uploader must not be called for path traversal")
+		return "", nil
+	}
+
+	body := "![alt](../secret.jpg)\n"
+	_, err := ReplaceLocalImages(context.Background(), body, dir, uploader)
+	if err == nil {
+		t.Fatal("expected error for path traversal, got nil")
+	}
+}

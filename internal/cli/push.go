@@ -81,7 +81,11 @@ func newPushCmd() *cobra.Command {
 			}
 			remoteArticle := article.FromEntry(remote)
 
-			if !hasChanges(local, remoteArticle) {
+			// Compare the image-replaced body against remote to avoid false positives
+			// on re-push: local.Body has local paths, remoteArticle.Body has hatena:syntax.
+			localForCompare := *local
+			localForCompare.Body = pushBody
+			if !hasChanges(&localForCompare, remoteArticle) {
 				fmt.Fprintln(cmd.OutOrStdout(), "No changes to push.")
 				return nil
 			}

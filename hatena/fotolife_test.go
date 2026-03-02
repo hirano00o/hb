@@ -57,6 +57,25 @@ func TestUploadImage_FileNotFound(t *testing.T) {
 	}
 }
 
+func TestUploadImage_FileTooLarge(t *testing.T) {
+	dir := t.TempDir()
+	imgPath := filepath.Join(dir, "big.jpg")
+	// Write a file just over 10 MB.
+	data := make([]byte, maxImageSize+1)
+	if err := os.WriteFile(imgPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewClient("user", "example.hateblo.jp", "key")
+	_, err := c.UploadImage(context.Background(), imgPath)
+	if err == nil {
+		t.Fatal("expected error for oversized file")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum size") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
 func TestUploadImage_Unauthorized(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/atom/post", func(w http.ResponseWriter, r *http.Request) {
