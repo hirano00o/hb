@@ -74,6 +74,22 @@ func TestMerge(t *testing.T) {
 	}
 }
 
+func TestMerge_Concurrency(t *testing.T) {
+	global := &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", Concurrency: 3}
+	project := &config.Config{Concurrency: 10}
+	merged := config.Merge(global, project)
+	if merged.Concurrency != 10 {
+		t.Errorf("Concurrency should be overridden by project, got %d", merged.Concurrency)
+	}
+
+	// Zero in project must not override global.
+	project2 := &config.Config{}
+	merged2 := config.Merge(global, project2)
+	if merged2.Concurrency != 3 {
+		t.Errorf("Concurrency should be kept from global when project is 0, got %d", merged2.Concurrency)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -248,5 +264,47 @@ func TestProjectConfigPath_NotFound(t *testing.T) {
 	_, err := config.ProjectConfigPath()
 	if err == nil {
 		t.Fatal("expected error when project config not found")
+	}
+}
+
+func TestLoadMerged_ConcurrencyEnvOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	globalDir := filepath.Join(dir, "hb")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "config.yaml"),
+		[]byte("hatena_id: u\nblog_id: b\napi_key: k\nconcurrency: 3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	t.Setenv("HB_CONCURRENCY", "8")
+	cfg, err := config.LoadMerged()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Concurrency != 8 {
+		t.Errorf("Concurrency should be 8 from env, got %d", cfg.Concurrency)
+	}
+}
+
+func TestLoadMerged_ConcurrencyEnvInvalid(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	if err := os.MkdirAll(filepath.Join(dir, "hb"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "hb", "config.yaml"),
+		[]byte("hatena_id: u\nblog_id: b\napi_key: k\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	t.Setenv("HB_CONCURRENCY", "invalid")
+	_, err := config.LoadMerged()
+	if err == nil {
+		t.Fatal("expected error for invalid HB_CONCURRENCY")
 	}
 }

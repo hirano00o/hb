@@ -42,6 +42,7 @@ hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
 | `HB_HATENA_ID` | Hatena ID |
 | `HB_BLOG_ID` | Blog ID |
 | `HB_API_KEY` | API キー |
+| `HB_CONCURRENCY` | pull の並列実行数（デフォルト: 5） |
 
 ```sh
 export HB_API_KEY=your_api_key
@@ -167,6 +168,15 @@ customUrlPath: my-custom-path
 ## 設定ファイルの優先度
 
 環境変数 > プロジェクト設定（`.hb/config.yaml`）> グローバル設定（`~/.config/hb/config.yaml`）
+
+### 設定ファイルの例
+
+```yaml
+hatena_id: yourhatenaId
+blog_id: yourblog.hateblo.jp
+api_key: your_api_key
+concurrency: 10  # pull の並列実行数（デフォルト: 5）
+```
 
 ## 開発
 

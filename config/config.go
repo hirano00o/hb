@@ -7,15 +7,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config holds the credentials and settings for Hatena Blog API access.
 type Config struct {
-	HatenaID string `yaml:"hatena_id"`
-	BlogID   string `yaml:"blog_id"`
-	APIKey   string `yaml:"api_key"`
+	HatenaID    string `yaml:"hatena_id"`
+	BlogID      string `yaml:"blog_id"`
+	APIKey      string `yaml:"api_key"`
+	Concurrency int    `yaml:"concurrency,omitempty"`
 }
 
 // GlobalConfigPath returns the path to the global config file.
@@ -92,11 +94,14 @@ func Merge(global, project *Config) *Config {
 	if project.APIKey != "" {
 		merged.APIKey = project.APIKey
 	}
+	if project.Concurrency != 0 {
+		merged.Concurrency = project.Concurrency
+	}
 	return &merged
 }
 
 // LoadMerged loads the global config, optionally merges the project config if found,
-// then applies environment variable overrides (HB_HATENA_ID, HB_BLOG_ID, HB_API_KEY).
+// then applies environment variable overrides (HB_HATENA_ID, HB_BLOG_ID, HB_API_KEY, HB_CONCURRENCY).
 // Priority: env vars > project config > global config.
 func LoadMerged() (*Config, error) {
 	globalPath, err := GlobalConfigPath()
@@ -132,6 +137,13 @@ func LoadMerged() (*Config, error) {
 	}
 	if v := os.Getenv("HB_API_KEY"); v != "" {
 		merged.APIKey = v
+	}
+	if v := os.Getenv("HB_CONCURRENCY"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return nil, fmt.Errorf("HB_CONCURRENCY must be a non-negative integer, got %q", v)
+		}
+		merged.Concurrency = n
 	}
 	return merged, nil
 }

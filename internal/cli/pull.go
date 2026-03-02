@@ -8,12 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
+
+const defaultConcurrency = 5
 
 func newPullCmd() *cobra.Command {
 	var force bool
@@ -42,10 +48,19 @@ func newPullCmd() *cobra.Command {
 				to = t
 			}
 
-			client, err := newClientFromConfig()
+			cfg, err := config.LoadMerged()
 			if err != nil {
 				return err
 			}
+			if err := config.Validate(cfg); err != nil {
+				return fmt.Errorf("config: %w", err)
+			}
+			concurrency := cfg.Concurrency
+			if concurrency <= 0 {
+				concurrency = defaultConcurrency
+			}
+
+			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
 			entries, err := client.ListEntries(ctx)
 			if err != nil {
 				return err
@@ -62,32 +77,56 @@ func newPullCmd() *cobra.Command {
 				}
 			}
 
-			saved := 0
+			// Filter out already-known entries before parallel processing.
+			toProcess := make([]*hatena.Entry, 0, len(entries))
 			for _, e := range entries {
 				if !force {
 					if _, exists := knownEditURLs[e.EditURL]; exists {
 						continue
 					}
 				}
-				a := article.FromEntry(e)
-				filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
-				path := filepath.Join(dir, filename)
-
-				destPath, skip, err := resolveConflict(cmd, path, force)
-				if err != nil {
-					return err
-				}
-				if skip {
-					fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
-					continue
-				}
-				if err := article.Write(destPath, a); err != nil {
-					return err
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
-				saved++
+				toProcess = append(toProcess, e)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%d entries saved.\n", saved)
+
+			var (
+				saved     atomic.Int64
+				interactMu sync.Mutex
+			)
+
+			eg, egCtx := errgroup.WithContext(ctx)
+			eg.SetLimit(concurrency)
+			_ = egCtx
+
+			for _, e := range toProcess {
+				e := e
+				eg.Go(func() error {
+					a := article.FromEntry(e)
+					filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
+					path := filepath.Join(dir, filename)
+
+					interactMu.Lock()
+					destPath, skip, err := resolveConflict(cmd, path, force)
+					interactMu.Unlock()
+					if err != nil {
+						return err
+					}
+					if skip {
+						fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
+						return nil
+					}
+					if err := article.Write(destPath, a); err != nil {
+						return err
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
+					saved.Add(1)
+					return nil
+				})
+			}
+
+			if err := eg.Wait(); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "%d entries saved.\n", saved.Load())
 			return nil
 		},
 	}
