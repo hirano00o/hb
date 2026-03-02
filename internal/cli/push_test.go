@@ -275,6 +275,58 @@ func TestPush_YesFlag_SkipsPrompt(t *testing.T) {
 	}
 }
 
+// TestPush_DiffDirection_LocalAsFrom verifies that the unified diff shows
+// local content as "from" (---) and remote content as "to" (+++).
+func TestPush_DiffDirection_LocalAsFrom(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/6", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			writeEntryXML(w, "Title", "remote body\n", false)
+		case http.MethodPut:
+			body, _ := io.ReadAll(r.Body)
+			w.Write(body)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/6"
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/6",
+	}
+	path, _ := setupPushTest(t, editURL, fm, "local body\n")
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetIn(strings.NewReader("N\n")) // abort after seeing diff
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	diffOut := out.String()
+	// "---" line must appear before "+++" line, and local content must be removed (-),
+	// remote content must be added (+) in the diff output.
+	minusIdx := strings.Index(diffOut, "-local body")
+	plusIdx := strings.Index(diffOut, "+remote body")
+	if minusIdx < 0 {
+		t.Errorf("expected '-local body' in diff output, got:\n%s", diffOut)
+	}
+	if plusIdx < 0 {
+		t.Errorf("expected '+remote body' in diff output, got:\n%s", diffOut)
+	}
+}
+
 // writeEntryXML writes a minimal Atom entry XML to w.
 func writeEntryXML(w http.ResponseWriter, title, content string, draft bool) {
 	draftStr := "no"
