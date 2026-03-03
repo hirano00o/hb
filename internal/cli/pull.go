@@ -85,21 +85,16 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 	entries = filterEntriesByDate(entries, from, to)
 
 	// Build a set of known editUrls from local files to skip already-fetched entries.
-	knownEditURLs := map[string]struct{}{}
-	if !force {
-		knownEditURLs, err = collectLocalEditURLs(dir, cmd.ErrOrStderr())
-		if err != nil {
-			return err
-		}
+	knownEditURLs, err := collectLocalEditURLs(dir, cmd.ErrOrStderr())
+	if err != nil {
+		return err
 	}
 
 	// Filter out already-known entries before parallel processing.
 	toProcess := make([]*hatena.Entry, 0, len(entries))
 	for _, e := range entries {
-		if !force {
-			if _, exists := knownEditURLs[e.EditURL]; exists {
-				continue
-			}
+		if _, exists := knownEditURLs[e.EditURL]; exists {
+			continue
 		}
 		toProcess = append(toProcess, e)
 	}

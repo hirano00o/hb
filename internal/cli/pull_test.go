@@ -162,6 +162,7 @@ func TestRunPull_Integration(t *testing.T) {
 		name        string
 		setupServer func(t *testing.T) *http.ServeMux
 		setupDir    func(t *testing.T, dir, srvURL string)
+		checkDir    func(t *testing.T, dir string)
 		force       bool
 		concurrency int
 		maxPages    int
@@ -222,6 +223,38 @@ func TestRunPull_Integration(t *testing.T) {
 			force:       false,
 			concurrency: 2,
 			wantFiles:   2, // existing.md + one new file for entry 2
+		},
+		{
+			name: "force=true: skip entries whose editURL already exists locally",
+			setupServer: func(t *testing.T) *http.ServeMux {
+				mux := http.NewServeMux()
+				mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+					base := "http://" + r.Host
+					entries := []struct{ id, title string }{{"1", "KnownEntry"}, {"2", "NewEntry"}}
+					w.Write([]byte(buildFeedXML(base, entries, "")))
+				})
+				return mux
+			},
+			setupDir: func(t *testing.T, dir, srvURL string) {
+				editURL := srvURL + "/user/blog/atom/entry/1"
+				content := "---\ntitle: KnownEntry\ndate: 2026-03-01T12:00:00+09:00\ndraft: false\neditUrl: " + editURL + "\n---\nold body\n"
+				if err := os.WriteFile(filepath.Join(dir, "existing.md"), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			force:       true,
+			concurrency: 2,
+			wantFiles:   2, // existing.md (entry1 skipped) + one new file for entry2
+			checkDir: func(t *testing.T, dir string) {
+				t.Helper()
+				b, err := os.ReadFile(filepath.Join(dir, "existing.md"))
+				if err != nil {
+					t.Fatalf("existing.md should not be removed: %v", err)
+				}
+				if !strings.Contains(string(b), "old body") {
+					t.Errorf("existing.md should not be overwritten, got: %s", b)
+				}
+			},
 		},
 		{
 			name: "force=true: auto-rename on filename collision",
@@ -311,6 +344,9 @@ func TestRunPull_Integration(t *testing.T) {
 					names = append(names, f.Name())
 				}
 				t.Errorf("got %d files %v, want %d", len(files), names, tt.wantFiles)
+			}
+			if tt.checkDir != nil {
+				tt.checkDir(t, dir)
 			}
 		})
 	}
