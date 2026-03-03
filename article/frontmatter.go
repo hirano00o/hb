@@ -11,13 +11,14 @@ import (
 
 // Frontmatter holds the metadata stored in the YAML header of an article file.
 type Frontmatter struct {
-	Title         string    `yaml:"title"`
-	Date          time.Time `yaml:"date"`
-	Draft         bool      `yaml:"draft"`
-	Category      []string  `yaml:"category,omitempty"`
-	URL           string    `yaml:"url,omitempty"`
-	EditURL       string    `yaml:"editUrl,omitempty"`
-	CustomURLPath string    `yaml:"customUrlPath,omitempty"`
+	Title         string     `yaml:"title"`
+	Date          time.Time  `yaml:"date"`
+	Draft         bool       `yaml:"draft"`
+	Category      []string   `yaml:"category,omitempty"`
+	URL           string     `yaml:"url,omitempty"`
+	EditURL       string     `yaml:"editUrl,omitempty"`
+	CustomURLPath string     `yaml:"customUrlPath,omitempty"`
+	ScheduledAt   *time.Time `yaml:"scheduledAt,omitempty"`
 }
 
 // split separates the raw file content into the YAML frontmatter string and the body string.

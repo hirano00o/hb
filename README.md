@@ -158,6 +158,7 @@ category:
 url: https://example.hateblo.jp/entry/2026/03/01/120000
 editUrl: https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/123456
 customUrlPath: my-custom-path
+scheduledAt: 2026-04-01T12:00:00+09:00
 ---
 ```
 
@@ -170,6 +171,7 @@ customUrlPath: my-custom-path
 | `url` | 公開URL（pullで自動設定） |
 | `editUrl` | AtomPub編集URL（pullで自動設定） |
 | `customUrlPath` | カスタムURLパス（オプション） |
+| `scheduledAt` | 予約投稿日時（RFC3339形式、オプション）。設定すると `draft` が `false` でも下書きとして投稿される |
 
 ## ファイル名規則
 

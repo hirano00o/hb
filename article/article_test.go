@@ -107,6 +107,70 @@ func TestSanitizeFilename(t *testing.T) {
 	}
 }
 
+func TestFromEntry_WithScheduledAt(t *testing.T) {
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	e := &hatena.Entry{
+		Title:       "Scheduled Entry",
+		Content:     "body",
+		Date:        time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC),
+		Draft:       true,
+		ScheduledAt: scheduledAt,
+	}
+	a := article.FromEntry(e)
+	if a.Frontmatter.ScheduledAt == nil {
+		t.Fatal("ScheduledAt should not be nil")
+	}
+	if !a.Frontmatter.ScheduledAt.Equal(scheduledAt) {
+		t.Errorf("ScheduledAt: got %v, want %v", a.Frontmatter.ScheduledAt, scheduledAt)
+	}
+	if !a.Frontmatter.Draft {
+		t.Error("draft should be true")
+	}
+}
+
+func TestFromEntry_NoScheduledAt(t *testing.T) {
+	e := &hatena.Entry{
+		Title:   "Plain Draft",
+		Content: "body",
+		Draft:   true,
+	}
+	a := article.FromEntry(e)
+	if a.Frontmatter.ScheduledAt != nil {
+		t.Errorf("ScheduledAt should be nil for plain draft, got %v", a.Frontmatter.ScheduledAt)
+	}
+}
+
+func TestToEntry_WithScheduledAt(t *testing.T) {
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	a := &article.Article{
+		Frontmatter: article.Frontmatter{
+			Title:       "Scheduled",
+			Draft:       false,
+			ScheduledAt: &scheduledAt,
+		},
+		Body: "body",
+	}
+	e := a.ToEntry()
+	// ToEntry maps ScheduledAt but does not force Draft; push.go is responsible for that.
+	if !e.ScheduledAt.Equal(scheduledAt) {
+		t.Errorf("ScheduledAt: got %v, want %v", e.ScheduledAt, scheduledAt)
+	}
+}
+
+func TestToEntry_NoScheduledAt(t *testing.T) {
+	a := &article.Article{
+		Frontmatter: article.Frontmatter{
+			Title: "Normal",
+			Draft: false,
+		},
+		Body: "body",
+	}
+	e := a.ToEntry()
+	if !e.ScheduledAt.IsZero() {
+		t.Errorf("ScheduledAt should be zero, got %v", e.ScheduledAt)
+	}
+}
+
 func TestFromEntry(t *testing.T) {
 	e := &hatena.Entry{
 		Title:      "Entry Title",
