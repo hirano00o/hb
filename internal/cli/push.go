@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/hirano00o/hb/article"
 	"github.com/spf13/cobra"
@@ -57,6 +58,10 @@ func newPushCmd() *cobra.Command {
 			}
 			pushEntry := local.ToEntry()
 			pushEntry.Content = pushBody
+			// scheduledAt requires draft=yes on the API side regardless of the local draft field.
+			if local.Frontmatter.ScheduledAt != nil {
+				pushEntry.Draft = true
+			}
 
 			// No editUrl → new entry, POST
 			if local.Frontmatter.EditURL == "" {
@@ -138,5 +143,17 @@ func hasChanges(local, remote *article.Article) bool {
 		lf.Title != rf.Title ||
 		lf.Draft != rf.Draft ||
 		!slices.Equal(lf.Category, rf.Category) ||
-		lf.CustomURLPath != rf.CustomURLPath
+		lf.CustomURLPath != rf.CustomURLPath ||
+		!scheduledAtEqual(lf.ScheduledAt, rf.ScheduledAt)
+}
+
+// scheduledAtEqual compares two *time.Time values for equality, treating nil as zero time.
+func scheduledAtEqual(a, b *time.Time) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(*b)
 }

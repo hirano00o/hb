@@ -89,12 +89,15 @@ func FromEntry(e *hatena.Entry) *Article {
 		EditURL:       e.EditURL,
 		CustomURLPath: e.CustomURL,
 	}
+	if !e.ScheduledAt.IsZero() {
+		fm.ScheduledAt = &e.ScheduledAt
+	}
 	return &Article{Frontmatter: fm, Body: e.Content}
 }
 
 // ToEntry converts the Article to a hatena.Entry.
 func (a *Article) ToEntry() *hatena.Entry {
-	return &hatena.Entry{
+	e := &hatena.Entry{
 		Title:      a.Frontmatter.Title,
 		Content:    a.Body,
 		Date:       a.Frontmatter.Date,
@@ -104,4 +107,8 @@ func (a *Article) ToEntry() *hatena.Entry {
 		EditURL:    a.Frontmatter.EditURL,
 		CustomURL:  a.Frontmatter.CustomURLPath,
 	}
+	if a.Frontmatter.ScheduledAt != nil {
+		e.ScheduledAt = *a.Frontmatter.ScheduledAt
+	}
+	return e
 }

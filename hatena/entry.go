@@ -15,15 +15,16 @@ const (
 
 // Entry represents a single Hatena Blog article.
 type Entry struct {
-	Title      string
-	Content    string
-	Date       time.Time
-	Updated    time.Time
-	Draft      bool
-	Categories []string
-	URL        string
-	EditURL    string
-	CustomURL  string
+	Title       string
+	Content     string
+	Date        time.Time
+	Updated     time.Time
+	Draft       bool
+	ScheduledAt time.Time // zero value means no scheduled publish
+	Categories  []string
+	URL         string
+	EditURL     string
+	CustomURL   string
 }
 
 // xmlEntry is the internal XML representation of an Atom entry element.
@@ -58,7 +59,8 @@ type xmlCategory struct {
 }
 
 type xmlControl struct {
-	Draft string `xml:"http://www.w3.org/2007/app draft"`
+	Draft     string `xml:"http://www.w3.org/2007/app draft"`
+	Scheduled string `xml:"http://www.hatena.ne.jp/info/xmlns#hatenablog scheduled,omitempty"`
 }
 
 // xmlFeed is the internal XML representation of an Atom feed element.
@@ -104,6 +106,11 @@ func entryFromXML(x *xmlEntry) *Entry {
 	}
 	if x.Control != nil && x.Control.Draft == "yes" {
 		e.Draft = true
+		if x.Control.Scheduled == "yes" {
+			if t, err := time.Parse(time.RFC3339, x.Updated); err == nil {
+				e.ScheduledAt = t
+			}
+		}
 	}
 	for _, l := range x.Links {
 		switch l.Rel {
@@ -131,16 +138,23 @@ func marshalEntry(e *Entry) ([]byte, error) {
 	if e.Draft {
 		draft = "yes"
 	}
+	ctrl := &xmlControl{Draft: draft}
+	if !e.ScheduledAt.IsZero() {
+		ctrl.Draft = "yes"
+		ctrl.Scheduled = "yes"
+	}
 	x := xmlEntry{
 		Xmlns:     nsAtom,
 		XmlnsApp:  nsApp,
 		XmlnsHb:   nsHatenaBlog,
 		Title:     e.Title,
 		Content:   xmlContent{Type: "text/x-markdown", Body: e.Content},
-		Control:   &xmlControl{Draft: draft},
+		Control:   ctrl,
 		CustomURL: e.CustomURL,
 	}
-	if !e.Updated.IsZero() {
+	if !e.ScheduledAt.IsZero() {
+		x.Updated = e.ScheduledAt.Format(time.RFC3339)
+	} else if !e.Updated.IsZero() {
 		x.Updated = e.Updated.Format(time.RFC3339)
 	}
 	for _, cat := range e.Categories {

@@ -85,6 +85,48 @@ func TestParseFrontmatter_Invalid(t *testing.T) {
 	}
 }
 
+func TestParseFrontmatter_WithScheduledAt(t *testing.T) {
+	yamlStr := "title: Test\ndate: 2026-03-01T12:00:00+09:00\ndraft: true\nscheduledAt: 2026-04-01T12:00:00+09:00\n"
+	fm, err := parseFrontmatter(yamlStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fm.ScheduledAt == nil {
+		t.Fatal("ScheduledAt should not be nil")
+	}
+	wantScheduled := time.Date(2026, 4, 1, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	if !fm.ScheduledAt.Equal(wantScheduled) {
+		t.Errorf("ScheduledAt: got %v, want %v", fm.ScheduledAt, wantScheduled)
+	}
+}
+
+func TestRenderFrontmatter_WithScheduledAt(t *testing.T) {
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	fm := &Frontmatter{
+		Title:       "Scheduled",
+		Draft:       true,
+		ScheduledAt: &scheduledAt,
+	}
+	out, err := RenderFrontmatter(fm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "scheduledAt:") {
+		t.Errorf("expected scheduledAt in output, got: %q", out)
+	}
+}
+
+func TestRenderFrontmatter_NoScheduledAt_Omitted(t *testing.T) {
+	fm := &Frontmatter{Title: "No Scheduled", Draft: false}
+	out, err := RenderFrontmatter(fm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "scheduledAt") {
+		t.Errorf("scheduledAt should be omitted when nil, got: %q", out)
+	}
+}
+
 func TestRenderFrontmatter(t *testing.T) {
 	fm := &Frontmatter{Title: "Hello", Draft: true}
 	out, err := RenderFrontmatter(fm)

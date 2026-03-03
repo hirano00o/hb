@@ -586,6 +586,118 @@ func TestPush_LocalImage_RePush_NoChanges(t *testing.T) {
 	}
 }
 
+// TestPush_HasChanges_ScheduledAt verifies that a change in scheduledAt is detected.
+func TestPush_HasChanges_ScheduledAt(t *testing.T) {
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	local := &article.Article{
+		Frontmatter: article.Frontmatter{
+			Title:       "Title",
+			ScheduledAt: &scheduledAt,
+		},
+		Body: "body",
+	}
+	// Remote has no scheduledAt
+	remote := &article.Article{
+		Frontmatter: article.Frontmatter{Title: "Title"},
+		Body:        "body",
+	}
+	if !hasChanges(local, remote) {
+		t.Error("expected hasChanges=true when scheduledAt differs")
+	}
+
+	// Same scheduledAt → no changes
+	remote2 := &article.Article{
+		Frontmatter: article.Frontmatter{
+			Title:       "Title",
+			ScheduledAt: &scheduledAt,
+		},
+		Body: "body",
+	}
+	if hasChanges(local, remote2) {
+		t.Error("expected hasChanges=false when scheduledAt is same")
+	}
+}
+
+// TestPush_ScheduledAt_NewEntry verifies that pushing a file with scheduledAt
+// sends draft=yes and hatenablog:scheduled=yes in the POST body.
+func TestPush_ScheduledAt_NewEntry(t *testing.T) {
+	var receivedBody []byte
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app"
+       xmlns:hatenablog="http://www.hatena.ne.jp/info/xmlns#hatenablog">
+  <title>Scheduled Entry</title>
+  <content type="text/x-markdown">body
+</content>
+  <published>2026-04-01T12:00:00Z</published>
+  <updated>2026-04-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/50"/>
+  <link rel="alternate" href=""/>
+  <app:control>
+    <app:draft>yes</app:draft>
+    <hatenablog:scheduled>yes</hatenablog:scheduled>
+  </app:control>
+</entry>`, r.Host)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	fm := article.Frontmatter{
+		Title:       "Scheduled Entry",
+		Date:        time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:       false, // intentionally false; ToEntry must force draft=true
+		ScheduledAt: &scheduledAt,
+	}
+	path, _ := setupPushTest(t, "", fm, "body\n")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	if len(receivedBody) == 0 {
+		t.Fatal("no POST request was made")
+	}
+
+	type scheduledEntry struct {
+		XMLName xml.Name `xml:"entry"`
+		Control struct {
+			Draft     string `xml:"draft"`
+			Scheduled string `xml:"http://www.hatena.ne.jp/info/xmlns#hatenablog scheduled"`
+		} `xml:"http://www.w3.org/2007/app control"`
+	}
+	var entry scheduledEntry
+	if err := xml.Unmarshal(receivedBody, &entry); err != nil {
+		t.Fatalf("parse request body: %v\nbody: %s", err, receivedBody)
+	}
+	if entry.Control.Draft != "yes" {
+		t.Errorf("expected draft=yes, got %q", entry.Control.Draft)
+	}
+	if entry.Control.Scheduled != "yes" {
+		t.Errorf("expected scheduled=yes, got %q", entry.Control.Scheduled)
+	}
+}
+
 // writeEntryXML writes a minimal Atom entry XML to w.
 func writeEntryXML(w http.ResponseWriter, title, content string, draft bool) {
 	draftStr := "no"

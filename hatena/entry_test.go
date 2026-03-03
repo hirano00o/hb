@@ -101,6 +101,93 @@ func TestParseFeed_LastPage(t *testing.T) {
 	}
 }
 
+func TestParseEntry_Scheduled(t *testing.T) {
+	data, err := os.ReadFile("testdata/entry_scheduled.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := parseEntry(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !e.Draft {
+		t.Error("draft should be true for scheduled entry")
+	}
+	wantScheduled := time.Date(2026, 4, 1, 3, 0, 0, 0, time.UTC) // +09:00 → UTC
+	if e.ScheduledAt.IsZero() {
+		t.Error("ScheduledAt should be set for scheduled entry")
+	}
+	if !e.ScheduledAt.UTC().Equal(wantScheduled) {
+		t.Errorf("ScheduledAt: got %v, want %v", e.ScheduledAt.UTC(), wantScheduled)
+	}
+}
+
+func TestParseEntry_Draft_NoScheduled(t *testing.T) {
+	data, err := os.ReadFile("testdata/entry_draft.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := parseEntry(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !e.ScheduledAt.IsZero() {
+		t.Errorf("ScheduledAt should be zero for plain draft, got %v", e.ScheduledAt)
+	}
+}
+
+func TestMarshalEntry_Scheduled(t *testing.T) {
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	e := &Entry{
+		Title:       "Scheduled",
+		Content:     "body",
+		Draft:       false, // intentionally false; marshalEntry must force draft=yes
+		ScheduledAt: scheduledAt,
+	}
+	data, err := marshalEntry(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parseEntry(data)
+	if err != nil {
+		t.Fatalf("round-trip parse: %v\nXML:\n%s", err, data)
+	}
+	if !parsed.Draft {
+		t.Error("draft should be true for scheduled entry after round-trip")
+	}
+	if !parsed.ScheduledAt.Equal(scheduledAt) {
+		t.Errorf("ScheduledAt: got %v, want %v", parsed.ScheduledAt, scheduledAt)
+	}
+	// updated must reflect scheduledAt, not Updated field
+	if !parsed.Updated.Equal(scheduledAt) {
+		t.Errorf("Updated should equal ScheduledAt: got %v, want %v", parsed.Updated, scheduledAt)
+	}
+}
+
+func TestMarshalEntry_Scheduled_OverridesUpdated(t *testing.T) {
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	updated := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	e := &Entry{
+		Title:       "Scheduled Override",
+		Content:     "body",
+		Draft:       true,
+		Updated:     updated,
+		ScheduledAt: scheduledAt,
+	}
+	data, err := marshalEntry(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parseEntry(data)
+	if err != nil {
+		t.Fatalf("round-trip parse: %v\nXML:\n%s", err, data)
+	}
+	// ScheduledAt takes priority over Updated
+	if !parsed.ScheduledAt.Equal(scheduledAt) {
+		t.Errorf("ScheduledAt: got %v, want %v", parsed.ScheduledAt, scheduledAt)
+	}
+}
+
 func TestMarshalEntry_RoundTrip(t *testing.T) {
 	e := &Entry{
 		Title:      "Round Trip",
