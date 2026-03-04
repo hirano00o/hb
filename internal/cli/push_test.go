@@ -770,18 +770,9 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/200", r.Host),
 				"https://example.com/entry/200")
 		case http.MethodPut:
-			w.Header().Set("Content-Type", "application/atom+xml")
-			fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
-<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
-  <title>Title</title>
-  <content type="text/x-markdown">local body
-</content>
-  <published>2026-03-01T12:00:00Z</published>
-  <updated>2026-03-01T12:00:00Z</updated>
-  <link rel="edit" href="http://%s/user/example.hateblo.jp/atom/entry/200"/>
-  <link rel="alternate" href="https://example.com/entry/200"/>
-  <app:control><app:draft>no</app:draft></app:control>
-</entry>`, r.Host)
+			writeEntryXMLFull(w, "Title", "local body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/200", r.Host),
+				"https://example.com/entry/200")
 		}
 	})
 	srv := httptest.NewServer(mux)

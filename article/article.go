@@ -59,8 +59,9 @@ func Write(path string, a *Article) error {
 
 var unsafeChars = regexp.MustCompile(`[/\\:*?"<>|]`)
 
-// SanitizeFilename replaces characters that are unsafe in file names with underscores.
+// SanitizeFilename replaces spaces with hyphens and other unsafe characters with underscores.
 func SanitizeFilename(name string) string {
+	name = strings.ReplaceAll(name, " ", "-")
 	return unsafeChars.ReplaceAllString(name, "_")
 }
 
