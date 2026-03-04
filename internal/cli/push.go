@@ -117,6 +117,7 @@ func newPushCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			local.Frontmatter.EditURL = updated.EditURL
 			local.Frontmatter.URL = updated.URL
 			local.Frontmatter.Date = updated.Date
 			if err := article.Write(path, local); err != nil {

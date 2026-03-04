@@ -586,35 +586,149 @@ func TestPush_LocalImage_RePush_NoChanges(t *testing.T) {
 	}
 }
 
-// TestPush_HasChanges_ScheduledAt verifies that a change in scheduledAt is detected.
-func TestPush_HasChanges_ScheduledAt(t *testing.T) {
+// TestPush_HasChanges verifies that hasChanges detects differences in each field.
+func TestPush_HasChanges(t *testing.T) {
 	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	local := &article.Article{
+	otherScheduledAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	date1 := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	date2 := time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC)
+
+	base := article.Article{
 		Frontmatter: article.Frontmatter{
-			Title:       "Title",
-			ScheduledAt: &scheduledAt,
+			Title:         "Title",
+			Draft:         false,
+			Category:      []string{"cat1"},
+			CustomURLPath: "custom",
+			Date:          date1,
 		},
 		Body: "body",
-	}
-	// Remote has no scheduledAt
-	remote := &article.Article{
-		Frontmatter: article.Frontmatter{Title: "Title"},
-		Body:        "body",
-	}
-	if !hasChanges(local, remote) {
-		t.Error("expected hasChanges=true when scheduledAt differs")
 	}
 
-	// Same scheduledAt → no changes
-	remote2 := &article.Article{
-		Frontmatter: article.Frontmatter{
-			Title:       "Title",
-			ScheduledAt: &scheduledAt,
+	tests := []struct {
+		name   string
+		local  article.Article
+		remote article.Article
+		want   bool
+	}{
+		{
+			name:   "no changes",
+			local:  base,
+			remote: base,
+			want:   false,
 		},
-		Body: "body",
+		{
+			name:  "body differs",
+			local: base,
+			remote: func() article.Article {
+				a := base
+				a.Body = "other"
+				return a
+			}(),
+			want: true,
+		},
+		{
+			name:  "title differs",
+			local: base,
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.Title = "Other"
+				return a
+			}(),
+			want: true,
+		},
+		{
+			name:  "draft differs",
+			local: base,
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.Draft = true
+				return a
+			}(),
+			want: true,
+		},
+		{
+			name:  "category differs",
+			local: base,
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.Category = []string{"other"}
+				return a
+			}(),
+			want: true,
+		},
+		{
+			name:  "customUrlPath differs",
+			local: base,
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.CustomURLPath = "other"
+				return a
+			}(),
+			want: true,
+		},
+		{
+			name:  "date differs",
+			local: base,
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.Date = date2
+				return a
+			}(),
+			want: true,
+		},
+		{
+			name: "scheduledAt: local set remote nil",
+			local: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &scheduledAt
+				return a
+			}(),
+			remote: base,
+			want:   true,
+		},
+		{
+			name:  "scheduledAt: both nil",
+			local: base,
+			remote: base,
+			want:  false,
+		},
+		{
+			name: "scheduledAt: same value",
+			local: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &scheduledAt
+				return a
+			}(),
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &scheduledAt
+				return a
+			}(),
+			want: false,
+		},
+		{
+			name: "scheduledAt: different value",
+			local: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &scheduledAt
+				return a
+			}(),
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &otherScheduledAt
+				return a
+			}(),
+			want: true,
+		},
 	}
-	if hasChanges(local, remote2) {
-		t.Error("expected hasChanges=false when scheduledAt is same")
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := hasChanges(&tc.local, &tc.remote)
+			if got != tc.want {
+				t.Errorf("hasChanges=%v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -698,6 +812,92 @@ func TestPush_ScheduledAt_NewEntry(t *testing.T) {
 	}
 }
 
+// TestPush_ScheduledAt_UpdateEntry verifies that updating an existing entry with scheduledAt
+// sends draft=yes and hatenablog:scheduled=yes in the PUT body.
+func TestPush_ScheduledAt_UpdateEntry(t *testing.T) {
+	var receivedBody []byte
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/51", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			// Remote has no scheduledAt so hasChanges returns true.
+			writeEntryXMLFull(w, "Scheduled Entry", "body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/51", r.Host),
+				"https://example.com/entry/51")
+		case http.MethodPut:
+			receivedBody, _ = io.ReadAll(r.Body)
+			w.Header().Set("Content-Type", "application/atom+xml")
+			fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app"
+       xmlns:hatenablog="http://www.hatena.ne.jp/info/xmlns#hatenablog">
+  <title>Scheduled Entry</title>
+  <content type="text/x-markdown">body
+</content>
+  <published>2026-04-01T12:00:00Z</published>
+  <updated>2026-04-01T12:00:00Z</updated>
+  <link rel="edit" href="http://%s/user/example.hateblo.jp/atom/entry/51"/>
+  <link rel="alternate" href="https://example.com/entry/51"/>
+  <app:control>
+    <app:draft>yes</app:draft>
+    <hatenablog:scheduled>yes</hatenablog:scheduled>
+  </app:control>
+</entry>`, r.Host)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	scheduledAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/51"
+	fm := article.Frontmatter{
+		Title:       "Scheduled Entry",
+		Date:        time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:       false, // ToEntry must force draft=true due to scheduledAt
+		EditURL:     editURL,
+		URL:         "https://example.com/entry/51",
+		ScheduledAt: &scheduledAt,
+	}
+	path, _ := setupPushTest(t, editURL, fm, "body\n")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--yes", path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	if len(receivedBody) == 0 {
+		t.Fatal("no PUT request was made")
+	}
+
+	type scheduledEntry struct {
+		XMLName xml.Name `xml:"entry"`
+		Control struct {
+			Draft     string `xml:"draft"`
+			Scheduled string `xml:"http://www.hatena.ne.jp/info/xmlns#hatenablog scheduled"`
+		} `xml:"http://www.w3.org/2007/app control"`
+	}
+	var entry scheduledEntry
+	if err := xml.Unmarshal(receivedBody, &entry); err != nil {
+		t.Fatalf("parse PUT body: %v\nbody: %s", err, receivedBody)
+	}
+	if entry.Control.Draft != "yes" {
+		t.Errorf("expected draft=yes in PUT body, got %q", entry.Control.Draft)
+	}
+	if entry.Control.Scheduled != "yes" {
+		t.Errorf("expected scheduled=yes in PUT body, got %q", entry.Control.Scheduled)
+	}
+}
+
 // TestPush_NewEntry_Create_UpdatesDate verifies that a POST response's published date
 // is written back to the local frontmatter Date field.
 func TestPush_NewEntry_Create_UpdatesDate(t *testing.T) {
@@ -770,8 +970,9 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/200", r.Host),
 				"https://example.com/entry/200")
 		case http.MethodPut:
+			// PUT response returns a new editUrl (entry/201) to simulate editUrl change.
 			writeEntryXMLFull(w, "Title", "local body\n", false,
-				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/200", r.Host),
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/201", r.Host),
 				"https://example.com/entry/200")
 		}
 	})
@@ -812,6 +1013,11 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 	want := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	if !updated.Frontmatter.Date.Equal(want) {
 		t.Errorf("expected Date=%v after PUT, got %v", want, updated.Frontmatter.Date)
+	}
+	// PUT response returned entry/201; verify the local file reflects the new editUrl.
+	wantEditURL := fmt.Sprintf("%s/user/example.hateblo.jp/atom/entry/201", srv.URL)
+	if updated.Frontmatter.EditURL != wantEditURL {
+		t.Errorf("expected EditURL=%q after PUT, got %q", wantEditURL, updated.Frontmatter.EditURL)
 	}
 }
 
