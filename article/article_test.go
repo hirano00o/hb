@@ -82,8 +82,8 @@ func TestGenerateFilename(t *testing.T) {
 		draft bool
 		want  string
 	}{
-		{"Hello World", false, "20260301_Hello World.md"},
-		{"Hello World", true, "draft_20260301_Hello World.md"},
+		{"Hello World", false, "20260301_Hello-World.md"},
+		{"Hello World", true, "draft_20260301_Hello-World.md"},
 		{"test/file:name", false, "20260301_test_file_name.md"},
 	}
 	for _, tt := range tests {
@@ -98,6 +98,8 @@ func TestSanitizeFilename(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"normal", "normal"},
 		{`a/b\c:d*e?f"g<h>i|j`, "a_b_c_d_e_f_g_h_i_j"},
+		{"hello world", "hello-world"},
+		{"hello  world", "hello--world"},
 	}
 	for _, tt := range tests {
 		got := article.SanitizeFilename(tt.in)
