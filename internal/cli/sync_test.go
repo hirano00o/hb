@@ -28,7 +28,7 @@ func TestSync_NoEditURL(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing editUrl, got nil")
 	}
-	if !strings.Contains(err.Error(), "has no editUrl in frontmatter") {
+	if !strings.Contains(err.Error(), "editUrl is missing from frontmatter") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

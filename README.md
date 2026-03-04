@@ -75,17 +75,6 @@ export HB_API_KEY=your_api_key
 hb push article.md
 ```
 
-### プロジェクト設定（オプション）
-
-特定ディレクトリ配下でグローバル設定を上書きしたい場合:
-
-```sh
-cd ~/blog-dir
-hb init
-```
-
-`.hb/config.yaml` が作成されます。空欄のフィールドはグローバル設定が使用されます。
-
 ## コマンドリファレンス
 
 ### `hb pull`

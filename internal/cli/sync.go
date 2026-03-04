@@ -23,7 +23,7 @@ func newSyncCmd() *cobra.Command {
 				return fmt.Errorf("read %s: %w", path, err)
 			}
 			if local.Frontmatter.EditURL == "" {
-				return fmt.Errorf("%s has no editUrl in frontmatter; use 'hb pull' first", path)
+				return fmt.Errorf("%s: editUrl is missing from frontmatter", path)
 			}
 
 			client, err := newClientFromConfig()

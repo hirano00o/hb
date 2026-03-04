@@ -1032,5 +1032,3 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 		t.Errorf("expected EditURL=%q after PUT, got %q", wantEditURL, updated.Frontmatter.EditURL)
 	}
 }
-
-
