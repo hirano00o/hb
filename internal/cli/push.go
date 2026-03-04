@@ -69,9 +69,10 @@ func newPushCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				// Update local file with the assigned editUrl and url
+				// Update local file with the assigned editUrl, url, and date
 				local.Frontmatter.EditURL = created.EditURL
 				local.Frontmatter.URL = created.URL
+				local.Frontmatter.Date = created.Date
 				if err := article.Write(path, local); err != nil {
 					return err
 				}
@@ -117,6 +118,7 @@ func newPushCmd() *cobra.Command {
 				return err
 			}
 			local.Frontmatter.URL = updated.URL
+			local.Frontmatter.Date = updated.Date
 			if err := article.Write(path, local); err != nil {
 				return err
 			}
