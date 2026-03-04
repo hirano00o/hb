@@ -125,7 +125,9 @@ func TestPush_Draft_FlagOverridesFrontmatter(t *testing.T) {
 		switch r.Method {
 		case http.MethodGet:
 			// return remote entry with draft=false
-			writeEntryXML(w, "Title", "body\n", false)
+			writeEntryXMLFull(w, "Title", "body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/1", r.Host),
+				"https://example.com/entry/1")
 		case http.MethodPut:
 			receivedBody, _ = io.ReadAll(r.Body)
 			// echo back
@@ -187,7 +189,9 @@ func TestPush_Draft_FlagOverridesFrontmatter(t *testing.T) {
 func TestPush_Draft_Conflict_Aborted(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/2", func(w http.ResponseWriter, r *http.Request) {
-		writeEntryXML(w, "Title", "body\n", false)
+		writeEntryXMLFull(w, "Title", "body\n", false,
+			fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/2", r.Host),
+			"https://example.com/entry/2")
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -227,7 +231,9 @@ func TestPush_ConfirmPrompt_Confirm(t *testing.T) {
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/3", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			writeEntryXML(w, "Title", "remote body\n", false) // different from local
+			writeEntryXMLFull(w, "Title", "remote body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/3", r.Host),
+				"https://example.com/entry/3") // different from local
 		case http.MethodPut:
 			putCalled = true
 			body, _ := io.ReadAll(r.Body)
@@ -272,7 +278,9 @@ func TestPush_ConfirmPrompt_Abort(t *testing.T) {
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/4", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			writeEntryXML(w, "Title", "remote body\n", false)
+			writeEntryXMLFull(w, "Title", "remote body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/4", r.Host),
+				"https://example.com/entry/4")
 		case http.MethodPut:
 			putCalled = true
 		}
@@ -318,7 +326,9 @@ func TestPush_YesFlag_SkipsPrompt(t *testing.T) {
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/5", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			writeEntryXML(w, "Title", "remote body\n", false)
+			writeEntryXMLFull(w, "Title", "remote body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/5", r.Host),
+				"https://example.com/entry/5")
 		case http.MethodPut:
 			putCalled = true
 			body, _ := io.ReadAll(r.Body)
@@ -363,7 +373,9 @@ func TestPush_DiffDirection_LocalAsFrom(t *testing.T) {
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/6", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			writeEntryXML(w, "Title", "remote body\n", false)
+			writeEntryXMLFull(w, "Title", "remote body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/6", r.Host),
+				"https://example.com/entry/6")
 		case http.MethodPut:
 			body, _ := io.ReadAll(r.Body)
 			w.Write(body)
@@ -1021,32 +1033,4 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 	}
 }
 
-// writeEntryXML writes a minimal Atom entry XML to w.
-func writeEntryXML(w http.ResponseWriter, title, content string, draft bool) {
-	draftStr := "no"
-	if draft {
-		draftStr = "yes"
-	}
-	e := &hatena.Entry{
-		Title:   title,
-		Content: content,
-		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
-		Draft:   draft,
-	}
-	_ = draftStr
-	_ = e
-
-	// Write a minimal valid Atom entry XML.
-	w.Header().Set("Content-Type", "application/atom+xml")
-	fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
-<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
-  <title>%s</title>
-  <content type="text/x-markdown">%s</content>
-  <published>2026-03-01T12:00:00Z</published>
-  <updated>2026-03-01T12:00:00Z</updated>
-  <link rel="edit" href="https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/1"/>
-  <link rel="alternate" href="https://example.com/entry/1"/>
-  <app:control><app:draft>%s</app:draft></app:control>
-</entry>`, title, content, draftStr)
-}
 

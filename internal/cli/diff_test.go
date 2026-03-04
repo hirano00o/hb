@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -76,7 +77,9 @@ func TestDiff_NoDifferences(t *testing.T) {
 func TestDiff_WithDifferences(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/11", func(w http.ResponseWriter, r *http.Request) {
-		writeEntryXML(w, "Title", "remote body\n", false)
+		writeEntryXMLFull(w, "Title", "remote body\n", false,
+			fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/11", r.Host),
+			"https://example.com/entry/11")
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
