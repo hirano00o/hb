@@ -698,6 +698,132 @@ func TestPush_ScheduledAt_NewEntry(t *testing.T) {
 	}
 }
 
+// TestPush_NewEntry_Create_UpdatesDate verifies that a POST response's published date
+// is written back to the local frontmatter Date field.
+func TestPush_NewEntry_Create_UpdatesDate(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>New Entry</title>
+  <content type="text/x-markdown">body
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/100"/>
+  <link rel="alternate" href="https://example.com/entry/100"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, r.Host)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	// Local Date is zero value; remote published is 2026-03-01T12:00:00Z.
+	fm := article.Frontmatter{
+		Title: "New Entry",
+		Date:  time.Time{},
+		Draft: false,
+	}
+	path, _ := setupPushTest(t, "", fm, "body\n")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	updated, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read updated file: %v", err)
+	}
+	want := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	if !updated.Frontmatter.Date.Equal(want) {
+		t.Errorf("expected Date=%v, got %v", want, updated.Frontmatter.Date)
+	}
+}
+
+// TestPush_Update_UpdatesDate verifies that a PUT response's published date
+// is written back to the local frontmatter Date field.
+func TestPush_Update_UpdatesDate(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/200", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			// Remote body differs so hasChanges returns true.
+			writeEntryXMLFull(w, "Title", "remote body\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/200", r.Host),
+				"https://example.com/entry/200")
+		case http.MethodPut:
+			w.Header().Set("Content-Type", "application/atom+xml")
+			fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>Title</title>
+  <content type="text/x-markdown">local body
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="http://%s/user/example.hateblo.jp/atom/entry/200"/>
+  <link rel="alternate" href="https://example.com/entry/200"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, r.Host)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/200"
+	// Local Date differs from remote published to confirm write-back occurs.
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/200",
+	}
+	path, _ := setupPushTest(t, editURL, fm, "local body\n")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--yes", path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	updated, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read updated file: %v", err)
+	}
+	want := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	if !updated.Frontmatter.Date.Equal(want) {
+		t.Errorf("expected Date=%v after PUT, got %v", want, updated.Frontmatter.Date)
+	}
+}
+
 // writeEntryXML writes a minimal Atom entry XML to w.
 func writeEntryXML(w http.ResponseWriter, title, content string, draft bool) {
 	draftStr := "no"
