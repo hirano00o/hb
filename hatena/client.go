@@ -61,6 +61,8 @@ func (c *Client) do(ctx context.Context, method, url string, body []byte) (*http
 	req.Header.Set("X-WSSE", wsseHeader)
 	req.Header.Set("Authorization", "WSSE profile=\"UsernameToken\"")
 	if body != nil {
+		// Both Blog API and Fotolife API are Atom Publishing Protocol endpoints,
+		// so application/atom+xml is the correct Content-Type for all request bodies.
 		req.Header.Set("Content-Type", "application/atom+xml")
 	}
 	resp, err := c.http.Do(req)

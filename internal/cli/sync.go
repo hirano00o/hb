@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newFetchCmd() *cobra.Command {
+func newSyncCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "fetch <file>",
-		Short: "Fetch the remote version of an entry and overwrite the local file",
+		Use:   "sync <file>",
+		Short: "Sync the remote version of an entry to the local file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
@@ -23,7 +23,7 @@ func newFetchCmd() *cobra.Command {
 				return fmt.Errorf("read %s: %w", path, err)
 			}
 			if local.Frontmatter.EditURL == "" {
-				return fmt.Errorf("%s has no editUrl in frontmatter; use 'hb pull' first", path)
+				return fmt.Errorf("%s: editUrl is missing from frontmatter", path)
 			}
 
 			client, err := newClientFromConfig()

@@ -18,7 +18,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(configCmd)
 
 	root.AddCommand(newPullCmd())
-	root.AddCommand(newFetchCmd())
+	root.AddCommand(newSyncCmd())
 	root.AddCommand(newPushCmd())
 	root.AddCommand(newDiffCmd())
 

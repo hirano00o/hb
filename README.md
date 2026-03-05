@@ -75,17 +75,6 @@ export HB_API_KEY=your_api_key
 hb push article.md
 ```
 
-### プロジェクト設定（オプション）
-
-特定ディレクトリ配下でグローバル設定を上書きしたい場合:
-
-```sh
-cd ~/blog-dir
-hb init
-```
-
-`.hb/config.yaml` が作成されます。空欄のフィールドはグローバル設定が使用されます。
-
 ## コマンドリファレンス
 
 ### `hb pull`
@@ -108,12 +97,12 @@ hb pull [--force|-f] [--dir <directory>] [--from <date>] [--to <date>]
 
 既に `editUrl` が一致するローカルファイルがある記事は自動的にスキップされます。
 
-### `hb fetch <file>`
+### `hb sync <file>`
 
 指定したローカルファイルのリモート最新版を取得します。差分を表示してから上書き確認します。
 
 ```sh
-hb fetch 20260301_my-article.md
+hb sync 20260301_my-article.md
 ```
 
 ### `hb push <file>`

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,15 +12,15 @@ import (
 	"github.com/hirano00o/hb/article"
 )
 
-// TestFetch_NoEditURL verifies that fetch returns an error when the file has no editUrl.
-func TestFetch_NoEditURL(t *testing.T) {
+// TestSync_NoEditURL verifies that sync returns an error when the file has no editUrl.
+func TestSync_NoEditURL(t *testing.T) {
 	fm := article.Frontmatter{
 		Title: "No EditURL",
 		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
 	}
 	path, _ := setupPushTest(t, "", fm, "local body\n")
 
-	cmd := newFetchCmd()
+	cmd := newSyncCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetArgs([]string{path})
@@ -27,13 +28,13 @@ func TestFetch_NoEditURL(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing editUrl, got nil")
 	}
-	if !strings.Contains(err.Error(), "has no editUrl in frontmatter") {
+	if !strings.Contains(err.Error(), "editUrl is missing from frontmatter") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-// TestFetch_NoDifferences verifies that fetch prints "No changes." when local and remote match.
-func TestFetch_NoDifferences(t *testing.T) {
+// TestSync_NoDifferences verifies that sync prints "No changes." when local and remote match.
+func TestSync_NoDifferences(t *testing.T) {
 	const entryID = "20"
 	var srvURL string
 
@@ -60,24 +61,26 @@ func TestFetch_NoDifferences(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, editURL, fm, "same body\n")
 
-	cmd := newFetchCmd()
+	cmd := newSyncCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetArgs([]string{path})
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("fetch failed: %v", err)
+		t.Fatalf("sync failed: %v", err)
 	}
 	if !strings.Contains(out.String(), "No changes.") {
 		t.Errorf("expected 'No changes.', got: %s", out.String())
 	}
 }
 
-// TestFetch_WithDifferences_Confirm verifies that answering 'y' overwrites the local file
+// TestSync_WithDifferences_Confirm verifies that answering 'y' after sync overwrites the local file
 // with remote content and prints "Updated: <path>".
-func TestFetch_WithDifferences_Confirm(t *testing.T) {
+func TestSync_WithDifferences_Confirm(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/21", func(w http.ResponseWriter, r *http.Request) {
-		writeEntryXML(w, "Title", "remote body\n", false)
+		writeEntryXMLFull(w, "Title", "remote body\n", false,
+			fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/21", r.Host),
+			"https://example.com/entry/21")
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -96,13 +99,13 @@ func TestFetch_WithDifferences_Confirm(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, editURL, fm, "local body\n")
 
-	cmd := newFetchCmd()
+	cmd := newSyncCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetIn(strings.NewReader("y\n"))
 	cmd.SetArgs([]string{path})
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("fetch failed: %v\noutput: %s", err, out.String())
+		t.Fatalf("sync failed: %v\noutput: %s", err, out.String())
 	}
 
 	if !strings.Contains(out.String(), "Updated: "+path) {
@@ -112,19 +115,21 @@ func TestFetch_WithDifferences_Confirm(t *testing.T) {
 	// Verify the file was overwritten with remote content.
 	a, err := article.Read(path)
 	if err != nil {
-		t.Fatalf("read after fetch: %v", err)
+		t.Fatalf("read after sync: %v", err)
 	}
 	if a.Body != "remote body\n" {
 		t.Errorf("expected body 'remote body\\n', got: %q", a.Body)
 	}
 }
 
-// TestFetch_WithDifferences_Abort verifies that answering 'N' leaves the local file unchanged
+// TestSync_WithDifferences_Abort verifies that answering 'N' after sync leaves the local file unchanged
 // and prints "Aborted.".
-func TestFetch_WithDifferences_Abort(t *testing.T) {
+func TestSync_WithDifferences_Abort(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/22", func(w http.ResponseWriter, r *http.Request) {
-		writeEntryXML(w, "Title", "remote body\n", false)
+		writeEntryXMLFull(w, "Title", "remote body\n", false,
+			fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/22", r.Host),
+			"https://example.com/entry/22")
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -143,13 +148,13 @@ func TestFetch_WithDifferences_Abort(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, editURL, fm, "local body\n")
 
-	cmd := newFetchCmd()
+	cmd := newSyncCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetIn(strings.NewReader("N\n"))
 	cmd.SetArgs([]string{path})
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("fetch failed: %v", err)
+		t.Fatalf("sync failed: %v", err)
 	}
 
 	if !strings.Contains(out.String(), "Aborted.") {
