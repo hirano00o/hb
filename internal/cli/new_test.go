@@ -69,7 +69,7 @@ func runNewCmd(t *testing.T, dir string, args []string, opts ...newCmdOpts) (str
 // TestNew_BasicCreate verifies basic file creation with correct filename and frontmatter.
 func TestNew_BasicCreate(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"My First Post"})
+	out, path, err := runNewCmd(t, dir, []string{"-t", "My First Post"})
 	if err != nil {
 		t.Fatalf("new failed: %v\noutput: %s", err, out)
 	}
@@ -97,7 +97,7 @@ func TestNew_BasicCreate(t *testing.T) {
 // TestNew_Draft verifies --draft flag adds draft_ prefix and sets draft: true.
 func TestNew_Draft(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"--draft", "Draft Post"})
+	out, path, err := runNewCmd(t, dir, []string{"--draft", "-t", "Draft Post"})
 	if err != nil {
 		t.Fatalf("new failed: %v\noutput: %s", err, out)
 	}
@@ -124,7 +124,7 @@ func TestNew_FileExists_Error(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, _, err := runNewCmd(t, dir, []string{"Existing Post"})
+	out, _, err := runNewCmd(t, dir, []string{"-t", "Existing Post"})
 	if err == nil {
 		t.Fatal("expected error for existing file, got nil")
 	}
@@ -137,7 +137,7 @@ func TestNew_FileExists_Error(t *testing.T) {
 // TestNew_Body_Argument verifies -b "hello\nworld" converts literal \n to newline.
 func TestNew_Body_Argument(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{`-b=hello\nworld`, "Body Post"})
+	out, path, err := runNewCmd(t, dir, []string{`-b=hello\nworld`, "-t", "Body Post"})
 	if err != nil {
 		t.Fatalf("new failed: %v\noutput: %s", err, out)
 	}
@@ -154,7 +154,7 @@ func TestNew_Body_Argument(t *testing.T) {
 // TestNew_Body_Pipe verifies piped input is used as-is (no \n conversion).
 func TestNew_Body_Pipe(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"-b", "Pipe Post"}, newCmdOpts{
+	out, path, err := runNewCmd(t, dir, []string{"-b", "-t", "Pipe Post"}, newCmdOpts{
 		stdin:       `hello\nworld`,
 		stdinIsPipe: true,
 	})
@@ -183,11 +183,13 @@ func TestNew_Body_FlagNoInput_Error(t *testing.T) {
 	isStdinPipe = func() bool { return false }
 	t.Cleanup(func() { isStdinPipe = orig })
 
-	out, _, err := runNewCmd(t, dir, []string{"-b", "No Input Post"})
+	out, _, err := runNewCmd(t, dir, []string{"-b", "-t", "No Input Post"})
 	if err == nil {
 		t.Fatal("expected error when -b with no value and no pipe, got nil")
 	}
-	_ = out
+	if !strings.Contains(err.Error(), "-b requires") {
+		t.Errorf("unexpected error message: %v\noutput: %s", err, out)
+	}
 }
 
 // TestNew_Push verifies --push flag POSTs to the API and writes back editUrl/url/date.
@@ -227,7 +229,7 @@ func TestNew_Push(t *testing.T) {
 	stubClient(t, c)
 
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"--push", "Push Post"})
+	out, path, err := runNewCmd(t, dir, []string{"--push", "-t", "Push Post"})
 	if err != nil {
 		t.Fatalf("new --push failed: %v\noutput: %s", err, out)
 	}
@@ -279,7 +281,7 @@ func TestNew_Push_FileExists_Error(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err := runNewCmd(t, dir, []string{"--push", "Exists Push"})
+	_, _, err := runNewCmd(t, dir, []string{"--push", "-t", "Exists Push"})
 	if err == nil {
 		t.Fatal("expected error for existing file")
 	}
@@ -300,7 +302,7 @@ func TestNew_NoArgs(t *testing.T) {
 // TestNew_ReadFromStdin_WithoutFlag verifies that stdin body without -b flag is not consumed.
 func TestNew_ReadFromStdin_WithoutFlag(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"No Body Post"})
+	out, path, err := runNewCmd(t, dir, []string{"-t", "No Body Post"})
 	if err != nil {
 		t.Fatalf("new failed: %v\noutput: %s", err, out)
 	}
@@ -351,7 +353,7 @@ world
 	stubClient(t, c)
 
 	dir := t.TempDir()
-	out, _, err := runNewCmd(t, dir, []string{"--push", `--body=hello\nworld`, "Body Push"})
+	out, _, err := runNewCmd(t, dir, []string{"--push", `--body=hello\nworld`, "-t", "Body Push"})
 	if err != nil {
 		t.Fatalf("new --push -b failed: %v\noutput: %s", err, out)
 	}

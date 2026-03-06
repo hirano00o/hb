@@ -36,13 +36,13 @@ func newNewCmdIn(dir string) *cobra.Command {
 	var draft bool
 	var push bool
 	var body string
+	var title string
 
 	cmd := &cobra.Command{
-		Use:   "new <title>",
+		Use:   "new --title <title>",
 		Short: "Create a new local article file with frontmatter",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			title := args[0]
 			now := timeNow()
 
 			// Resolve body content.
@@ -106,6 +106,8 @@ func newNewCmdIn(dir string) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVarP(&title, "title", "t", "", "Article title (required)")
+	_ = cmd.MarkFlagRequired("title")
 	cmd.Flags().BoolVar(&draft, "draft", false, "Create as draft (adds draft_ prefix to filename and sets draft: true)")
 	cmd.Flags().BoolVarP(&push, "push", "p", false, "Push to Hatena Blog after creating the local file")
 	cmd.Flags().StringVarP(&body, "body", "b", "", "Article body (-b alone reads from stdin pipe)")
