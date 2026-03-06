@@ -15,7 +15,7 @@ import (
 // timeNow is a package-level variable so tests can inject a fixed time.
 var timeNow = time.Now
 
-// isStdinPipe returns true when stdin is a pipe (not a terminal).
+// isStdinPipe returns true when stdin is a pipe or redirected file (not a terminal).
 // It is a package-level variable so tests can stub it.
 var isStdinPipe = func() bool {
 	fi, err := os.Stdin.Stat()
@@ -84,14 +84,14 @@ func newNewCmdIn(dir string) *cobra.Command {
 
 			pushBody, err := article.ReplaceLocalImages(ctx, a.Body, filepath.Dir(path), client.UploadImage)
 			if err != nil {
-				return fmt.Errorf("replace images: %w", err)
+				return fmt.Errorf("replace images: %w (local file saved at %s; retry with: hb push %s)", err, path, path)
 			}
 			pushEntry := a.ToEntry()
 			pushEntry.Content = pushBody
 
 			created, err := client.CreateEntry(ctx, pushEntry)
 			if err != nil {
-				return fmt.Errorf("%w\n(local file saved at %s; retry with: hb push %s)", err, path, path)
+				return fmt.Errorf("%w (local file saved at %s; retry with: hb push %s)", err, path, path)
 			}
 			a.Frontmatter.EditURL = created.EditURL
 			a.Frontmatter.URL = created.URL

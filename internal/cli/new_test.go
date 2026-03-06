@@ -44,6 +44,16 @@ func runNewCmd(t *testing.T, dir string, args []string, opts ...newCmdOpts) (str
 	isStdinPipe = func() bool { return pipeResult }
 	t.Cleanup(func() { isStdinPipe = orig })
 
+	// Snapshot pre-existing .md files so we can identify the newly created one.
+	before := map[string]struct{}{}
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".md") {
+				before[e.Name()] = struct{}{}
+			}
+		}
+	}
+
 	cmd := newNewCmdIn(dir)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -54,13 +64,15 @@ func runNewCmd(t *testing.T, dir string, args []string, opts ...newCmdOpts) (str
 	cmd.SetArgs(args)
 	runErr := cmd.Execute()
 
-	// Find created .md file in dir (if any).
+	// Find the .md file created during this run (not pre-existing).
 	var created string
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".md") {
-			created = filepath.Join(dir, e.Name())
-			break
+			if _, existed := before[e.Name()]; !existed {
+				created = filepath.Join(dir, e.Name())
+				break
+			}
 		}
 	}
 	return out.String(), created, runErr
@@ -329,9 +341,7 @@ func TestNew_ReadFromStdin_WithoutPipe(t *testing.T) {
 func TestNew_Push_WithBody(t *testing.T) {
 	var receivedBody []byte
 	mux := http.NewServeMux()
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
-
+	srv := httptest.NewUnstartedServer(mux)
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -353,6 +363,8 @@ world
   <app:control><app:draft>no</app:draft></app:control>
 </entry>`, srv.URL)
 	})
+	srv.Start()
+	t.Cleanup(srv.Close)
 
 	t.Setenv("HB_HATENA_ID", "user")
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
