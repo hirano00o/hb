@@ -68,11 +68,12 @@ func newNewCmdIn(dir string) *cobra.Command {
 			if err := article.Write(path, a); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Created: %s\n", path)
 
 			if !push {
+				fmt.Fprintf(cmd.OutOrStdout(), "Created: %s\n", path)
 				return nil
 			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Saved: %s\n", path)
 
 			// --push: POST to the API (same flow as push.go CreateEntry path).
 			ctx := cmd.Context()
@@ -87,14 +88,10 @@ func newNewCmdIn(dir string) *cobra.Command {
 			}
 			pushEntry := a.ToEntry()
 			pushEntry.Content = pushBody
-			// scheduledAt requires draft=yes on the API side regardless of the local draft field.
-			if a.Frontmatter.ScheduledAt != nil {
-				pushEntry.Draft = true
-			}
 
 			created, err := client.CreateEntry(ctx, pushEntry)
 			if err != nil {
-				return err
+				return fmt.Errorf("%w\n(local file saved at %s; retry with: hb push %s)", err, path, path)
 			}
 			a.Frontmatter.EditURL = created.EditURL
 			a.Frontmatter.URL = created.URL

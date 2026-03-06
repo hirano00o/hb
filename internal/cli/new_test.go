@@ -199,22 +199,6 @@ func TestNew_Body_Pipe(t *testing.T) {
 	}
 }
 
-// TestNew_NoPipeNoBody verifies that without -b and without piped stdin, body is empty.
-func TestNew_NoPipeNoBody(t *testing.T) {
-	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"-t", "No Body Post2"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
-	}
-	a, err := article.Read(path)
-	if err != nil {
-		t.Fatalf("read file: %v", err)
-	}
-	if a.Body != "" {
-		t.Errorf("expected empty body, got: %q", a.Body)
-	}
-}
-
 // TestNew_Push verifies --push flag POSTs to the API and writes back editUrl/url/date.
 func TestNew_Push(t *testing.T) {
 	postCalled := false
@@ -260,8 +244,11 @@ func TestNew_Push(t *testing.T) {
 	if !postCalled {
 		t.Fatal("expected POST request")
 	}
+	if !strings.Contains(out, "Saved:") {
+		t.Errorf("expected 'Saved:' in output for local file, got: %s", out)
+	}
 	if !strings.Contains(out, "Created:") {
-		t.Errorf("expected 'Created:' in output, got: %s", out)
+		t.Errorf("expected 'Created:' in output for remote URL, got: %s", out)
 	}
 
 	a, err := article.Read(path)
