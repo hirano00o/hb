@@ -137,7 +137,7 @@ func TestNew_FileExists_Error(t *testing.T) {
 // TestNew_Body_Argument verifies -b "hello\nworld" converts literal \n to newline.
 func TestNew_Body_Argument(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{`-b=hello\nworld`, "-t", "Body Post"})
+	out, path, err := runNewCmd(t, dir, []string{"-b", `hello\nworld`, "-t", "Body Post"})
 	if err != nil {
 		t.Fatalf("new failed: %v\noutput: %s", err, out)
 	}
@@ -151,10 +151,10 @@ func TestNew_Body_Argument(t *testing.T) {
 	}
 }
 
-// TestNew_Body_Pipe verifies piped input is used as-is (no \n conversion).
+// TestNew_Body_Pipe verifies piped stdin is used as-is (no \n conversion) even without -b.
 func TestNew_Body_Pipe(t *testing.T) {
 	dir := t.TempDir()
-	out, path, err := runNewCmd(t, dir, []string{"-b", "-t", "Pipe Post"}, newCmdOpts{
+	out, path, err := runNewCmd(t, dir, []string{"-t", "Pipe Post"}, newCmdOpts{
 		stdin:       `hello\nworld`,
 		stdinIsPipe: true,
 	})
@@ -175,20 +175,24 @@ func TestNew_Body_Pipe(t *testing.T) {
 	}
 }
 
-// TestNew_Body_FlagNoInput_Error verifies -b with no value and no pipe returns an error.
-func TestNew_Body_FlagNoInput_Error(t *testing.T) {
+// TestNew_NoPipeNoBody verifies that without -b and without piped stdin, body is empty.
+func TestNew_NoPipeNoBody(t *testing.T) {
 	dir := t.TempDir()
 
 	orig := isStdinPipe
 	isStdinPipe = func() bool { return false }
 	t.Cleanup(func() { isStdinPipe = orig })
 
-	out, _, err := runNewCmd(t, dir, []string{"-b", "-t", "No Input Post"})
-	if err == nil {
-		t.Fatal("expected error when -b with no value and no pipe, got nil")
+	out, path, err := runNewCmd(t, dir, []string{"-t", "No Body Post2"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
 	}
-	if !strings.Contains(err.Error(), "-b requires") {
-		t.Errorf("unexpected error message: %v\noutput: %s", err, out)
+	a, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if a.Body != "" {
+		t.Errorf("expected empty body, got: %q", a.Body)
 	}
 }
 
@@ -299,8 +303,12 @@ func TestNew_NoArgs(t *testing.T) {
 	}
 }
 
-// TestNew_ReadFromStdin_WithoutFlag verifies that stdin body without -b flag is not consumed.
-func TestNew_ReadFromStdin_WithoutFlag(t *testing.T) {
+// TestNew_ReadFromStdin_WithoutPipe verifies that stdin is not consumed when not piped.
+func TestNew_ReadFromStdin_WithoutPipe(t *testing.T) {
+	orig := isStdinPipe
+	isStdinPipe = func() bool { return false }
+	t.Cleanup(func() { isStdinPipe = orig })
+
 	dir := t.TempDir()
 	out, path, err := runNewCmd(t, dir, []string{"-t", "No Body Post"})
 	if err != nil {
@@ -311,7 +319,7 @@ func TestNew_ReadFromStdin_WithoutFlag(t *testing.T) {
 		t.Fatalf("read file: %v", err)
 	}
 	if a.Body != "" {
-		t.Errorf("expected empty body without -b flag, got: %q", a.Body)
+		t.Errorf("expected empty body without pipe, got: %q", a.Body)
 	}
 }
 
@@ -353,7 +361,7 @@ world
 	stubClient(t, c)
 
 	dir := t.TempDir()
-	out, _, err := runNewCmd(t, dir, []string{"--push", `--body=hello\nworld`, "-t", "Body Push"})
+	out, _, err := runNewCmd(t, dir, []string{"--push", "-b", `hello\nworld`, "-t", "Body Push"})
 	if err != nil {
 		t.Fatalf("new --push -b failed: %v\noutput: %s", err, out)
 	}

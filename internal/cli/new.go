@@ -25,9 +25,6 @@ var isStdinPipe = func() bool {
 	return (fi.Mode() & os.ModeCharDevice) == 0
 }
 
-// bodySentinel is the NoOptDefVal for -b: indicates -b was given with no value.
-const bodySentinel = "\x00"
-
 func newNewCmd() *cobra.Command {
 	return newNewCmdIn(".")
 }
@@ -114,34 +111,28 @@ func newNewCmdIn(dir string) *cobra.Command {
 	_ = cmd.MarkFlagRequired("title")
 	cmd.Flags().BoolVar(&draft, "draft", false, "Create as draft (adds draft_ prefix to filename and sets draft: true)")
 	cmd.Flags().BoolVarP(&push, "push", "p", false, "Push to Hatena Blog after creating the local file")
-	cmd.Flags().StringVarP(&body, "body", "b", "", "Article body (-b alone reads from stdin pipe)")
-	// NoOptDefVal makes -b without a value set body to sentinel instead of the empty default.
-	cmd.Flags().Lookup("body").NoOptDefVal = bodySentinel
+	cmd.Flags().StringVarP(&body, "body", "b", "", "Article body; omit to read from stdin pipe if available")
 
 	return cmd
 }
 
-// resolveBody determines the article body from the -b flag value.
+// resolveBody determines the article body.
 //
-//   - flag not given            → empty string
-//   - -b "text"                 → text, with literal \n replaced by real newlines
-//   - -b (no value) + stdin pipe → read from stdin as-is
-//   - -b (no value) + no pipe   → error
+//   - -b "text"      → text, with literal \n replaced by real newlines
+//   - stdin pipe     → read from stdin as-is (whether or not -b is given)
+//   - otherwise      → empty string
 func resolveBody(cmd *cobra.Command, body string) (string, error) {
-	if !cmd.Flags().Changed("body") {
-		return "", nil
-	}
-	if body != bodySentinel {
-		// Argument provided: convert literal \n to real newlines.
+	if cmd.Flags().Changed("body") {
+		// Explicit value: convert literal \n to real newlines.
 		return strings.ReplaceAll(body, `\n`, "\n"), nil
 	}
-	// Sentinel: -b was given without a value; read from stdin pipe.
-	if !isStdinPipe() {
-		return "", fmt.Errorf("-b requires a value or piped stdin")
+	// No -b flag: read from stdin pipe if available.
+	if isStdinPipe() {
+		data, err := io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return "", fmt.Errorf("read stdin: %w", err)
+		}
+		return string(data), nil
 	}
-	data, err := io.ReadAll(cmd.InOrStdin())
-	if err != nil {
-		return "", fmt.Errorf("read stdin: %w", err)
-	}
-	return string(data), nil
+	return "", nil
 }

@@ -143,13 +143,13 @@ hb diff 20260301_my-article.md
 フロントマター付きのMarkdownファイルをカレントディレクトリに新規作成します。
 
 ```sh
-hb new --title|-t <title> [--draft] [--push|-p] [--body|-b [<body>]]
+hb new --title|-t <title> [--draft] [--push|-p] [--body|-b <body>]
 ```
 
 - `--title` / `-t`: 記事タイトル（必須）
 - `--draft`: 下書きとして作成。ファイル名に `draft_` プレフィックスを付与し、frontmatter に `draft: true` を設定
 - `--push` / `-p`: ファイル作成後にリモートへ新規投稿（POST）。`editUrl`・`url`・`date` をローカルに書き戻し
-- `--body` / `-b`: 作成するファイルの本文を指定
+- `--body` / `-b`: 作成するファイルの本文を指定。省略時は stdin がパイプなら自動で読み込む（`\n` は変換しない）
 
 同名ファイルが既に存在する場合はエラーで中断します。先にファイルをリネームしてから再実行してください。
 
@@ -162,11 +162,11 @@ hb new -t "はじめての記事"
 hb new --draft -t "下書き記事"
 # → draft_20260306_下書き記事.md を作成
 
-# 本文を引数で指定（\n は改行に変換）
-hb new -b '# はじめに\n\n本文です。' -t "はじめての記事"
+# 本文をフラグで指定（\n は改行に変換）
+hb new -t "はじめての記事" -b '# はじめに\n\n本文です。'
 
 # パイプで本文を渡す（\n は変換しない）
-cat body.md | hb new -b -t "はじめての記事"
+cat body.md | hb new -t "はじめての記事"
 
 # 作成と同時にリモートへ投稿
 hb new --push -t "公開記事"
