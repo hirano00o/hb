@@ -19,28 +19,38 @@ import (
 // fixedNow is the time injected in new command tests.
 var fixedNow = time.Date(2026, 3, 6, 0, 0, 0, 0, time.UTC)
 
-// runNewCmd executes newNewCmd with the given args in a temp dir.
-// outDir is where the file should be created (passed as working directory context).
-// Returns stdout, the created file path, and any error.
-func runNewCmd(t *testing.T, dir string, args []string) (string, string, error) {
+// newCmdOpts holds optional overrides for runNewCmd.
+type newCmdOpts struct {
+	stdin       string // content to feed as stdin (empty means no stdin override)
+	stdinIsPipe bool   // stub isStdinPipe to return true
+}
+
+// runNewCmd executes newNewCmdIn(dir) with the given args.
+// Returns stdout+stderr, the first created .md file path, and any error.
+func runNewCmd(t *testing.T, dir string, args []string, opts ...newCmdOpts) (string, string, error) {
 	t.Helper()
+
 	origNow := timeNow
 	timeNow = func() time.Time { return fixedNow }
 	t.Cleanup(func() { timeNow = origNow })
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+	var opt newCmdOpts
+	if len(opts) > 0 {
+		opt = opts[0]
 	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
+	if opt.stdinIsPipe {
+		orig := isStdinPipe
+		isStdinPipe = func() bool { return true }
+		t.Cleanup(func() { isStdinPipe = orig })
 	}
-	t.Cleanup(func() { os.Chdir(origDir) }) //nolint:errcheck
 
-	cmd := newNewCmd()
+	cmd := newNewCmdIn(dir)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
+	if opt.stdin != "" {
+		cmd.SetIn(strings.NewReader(opt.stdin))
+	}
 	cmd.SetArgs(args)
 	runErr := cmd.Execute()
 
@@ -109,7 +119,6 @@ func TestNew_Draft(t *testing.T) {
 // TestNew_FileExists_Error verifies that creating a file that already exists returns an error.
 func TestNew_FileExists_Error(t *testing.T) {
 	dir := t.TempDir()
-	// Pre-create the file.
 	existing := filepath.Join(dir, "20260306_Existing-Post.md")
 	if err := os.WriteFile(existing, []byte("---\ntitle: Existing Post\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -145,35 +154,14 @@ func TestNew_Body_Argument(t *testing.T) {
 // TestNew_Body_Pipe verifies piped input is used as-is (no \n conversion).
 func TestNew_Body_Pipe(t *testing.T) {
 	dir := t.TempDir()
-
-	origNow := timeNow
-	timeNow = func() time.Time { return fixedNow }
-	t.Cleanup(func() { timeNow = origNow })
-
-	origDir, err := os.Getwd()
+	out, path, err := runNewCmd(t, dir, []string{"-b", "Pipe Post"}, newCmdOpts{
+		stdin:       `hello\nworld`,
+		stdinIsPipe: true,
+	})
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chdir(origDir) }) //nolint:errcheck
-
-	origIsStdinPipe := isStdinPipe
-	isStdinPipe = func() bool { return true }
-	t.Cleanup(func() { isStdinPipe = origIsStdinPipe })
-
-	cmd := newNewCmd()
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-	cmd.SetIn(strings.NewReader(`hello\nworld`))
-	cmd.SetArgs([]string{"-b", "Pipe Post"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("new failed: %v\noutput: %s", err, out.String())
+		t.Fatalf("new failed: %v\noutput: %s", err, out)
 	}
 
-	path := filepath.Join(dir, "20260306_Pipe-Post.md")
 	a, err := article.Read(path)
 	if err != nil {
 		t.Fatalf("read created file: %v", err)
@@ -191,9 +179,9 @@ func TestNew_Body_Pipe(t *testing.T) {
 func TestNew_Body_FlagNoInput_Error(t *testing.T) {
 	dir := t.TempDir()
 
-	origIsStdinPipe := isStdinPipe
+	orig := isStdinPipe
 	isStdinPipe = func() bool { return false }
-	t.Cleanup(func() { isStdinPipe = origIsStdinPipe })
+	t.Cleanup(func() { isStdinPipe = orig })
 
 	out, _, err := runNewCmd(t, dir, []string{"-b", "No Input Post"})
 	if err == nil {
@@ -206,6 +194,7 @@ func TestNew_Body_FlagNoInput_Error(t *testing.T) {
 func TestNew_Push(t *testing.T) {
 	postCalled := false
 	mux := http.NewServeMux()
+	srv := httptest.NewUnstartedServer(mux)
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -224,9 +213,9 @@ func TestNew_Push(t *testing.T) {
   <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/42"/>
   <link rel="alternate" href="https://example.com/entry/42"/>
   <app:control><app:draft>no</app:draft></app:control>
-</entry>`, r.Host)
+</entry>`, srv.URL)
 	})
-	srv := httptest.NewServer(mux)
+	srv.Start()
 	t.Cleanup(srv.Close)
 
 	t.Setenv("HB_HATENA_ID", "user")
@@ -328,6 +317,9 @@ func TestNew_ReadFromStdin_WithoutFlag(t *testing.T) {
 func TestNew_Push_WithBody(t *testing.T) {
 	var receivedBody []byte
 	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -347,10 +339,8 @@ world
   <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/43"/>
   <link rel="alternate" href="https://example.com/entry/43"/>
   <app:control><app:draft>no</app:draft></app:control>
-</entry>`, r.Host)
+</entry>`, srv.URL)
 	})
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
 
 	t.Setenv("HB_HATENA_ID", "user")
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")

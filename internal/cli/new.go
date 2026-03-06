@@ -29,6 +29,10 @@ var isStdinPipe = func() bool {
 const bodySentinel = "\x00"
 
 func newNewCmd() *cobra.Command {
+	return newNewCmdIn(".")
+}
+
+func newNewCmdIn(dir string) *cobra.Command {
 	var draft bool
 	var push bool
 	var body string
@@ -48,7 +52,7 @@ func newNewCmd() *cobra.Command {
 			}
 
 			filename := article.GenerateFilename(title, now, draft)
-			path := filepath.Join(".", filename)
+			path := filepath.Join(dir, filename)
 
 			// Abort if the file already exists to avoid silent overwrites.
 			if _, err := os.Stat(path); err == nil {
