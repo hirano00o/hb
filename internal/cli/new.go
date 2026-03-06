@@ -90,6 +90,10 @@ func newNewCmdIn(dir string) *cobra.Command {
 			}
 			pushEntry := a.ToEntry()
 			pushEntry.Content = pushBody
+			// scheduledAt requires draft=yes on the API side regardless of the local draft field.
+			if a.Frontmatter.ScheduledAt != nil {
+				pushEntry.Draft = true
+			}
 
 			created, err := client.CreateEntry(ctx, pushEntry)
 			if err != nil {

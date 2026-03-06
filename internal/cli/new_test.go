@@ -290,7 +290,7 @@ func TestNew_Push_FileExists_Error(t *testing.T) {
 	}
 }
 
-// TestNew_NoArgs verifies that calling new without a title argument returns an error.
+// TestNew_NoArgs verifies that omitting the required --title flag returns an error.
 func TestNew_NoArgs(t *testing.T) {
 	dir := t.TempDir()
 	_, _, err := runNewCmd(t, dir, []string{})
