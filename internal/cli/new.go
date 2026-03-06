@@ -108,7 +108,9 @@ func newNewCmdIn(dir string) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&title, "title", "t", "", "Article title (required)")
-	_ = cmd.MarkFlagRequired("title")
+	if err := cmd.MarkFlagRequired("title"); err != nil {
+		panic(err)
+	}
 	cmd.Flags().BoolVar(&draft, "draft", false, "Create as draft (adds draft_ prefix to filename and sets draft: true)")
 	cmd.Flags().BoolVarP(&push, "push", "p", false, "Push to Hatena Blog after creating the local file")
 	cmd.Flags().StringVarP(&body, "body", "b", "", "Article body; omit to read from stdin pipe if available")
@@ -119,7 +121,7 @@ func newNewCmdIn(dir string) *cobra.Command {
 // resolveBody determines the article body.
 //
 //   - -b "text"      → text, with literal \n replaced by real newlines
-//   - stdin pipe     → read from stdin as-is (whether or not -b is given)
+//   - stdin pipe     → read from stdin as-is (only when -b is not given)
 //   - otherwise      → empty string
 func resolveBody(cmd *cobra.Command, body string) (string, error) {
 	if cmd.Flags().Changed("body") {

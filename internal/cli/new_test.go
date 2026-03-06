@@ -38,11 +38,11 @@ func runNewCmd(t *testing.T, dir string, args []string, opts ...newCmdOpts) (str
 	if len(opts) > 0 {
 		opt = opts[0]
 	}
-	if opt.stdinIsPipe {
-		orig := isStdinPipe
-		isStdinPipe = func() bool { return true }
-		t.Cleanup(func() { isStdinPipe = orig })
-	}
+	// Always stub isStdinPipe to prevent real pipe state from affecting tests.
+	orig := isStdinPipe
+	pipeResult := opt.stdinIsPipe
+	isStdinPipe = func() bool { return pipeResult }
+	t.Cleanup(func() { isStdinPipe = orig })
 
 	cmd := newNewCmdIn(dir)
 	var out bytes.Buffer
@@ -151,6 +151,30 @@ func TestNew_Body_Argument(t *testing.T) {
 	}
 }
 
+// TestNew_Body_FlagTakesPrecedenceOverPipe verifies that -b value is used even when stdin is also piped.
+func TestNew_Body_FlagTakesPrecedenceOverPipe(t *testing.T) {
+	dir := t.TempDir()
+	out, path, err := runNewCmd(t, dir, []string{"-b", `flag\nvalue`, "-t", "Flag Wins"}, newCmdOpts{
+		stdin:       "pipe content",
+		stdinIsPipe: true,
+	})
+	if err != nil {
+		t.Fatalf("new failed: %v\noutput: %s", err, out)
+	}
+
+	a, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read created file: %v", err)
+	}
+	// -b value must win over piped stdin; \n converted.
+	if !strings.Contains(a.Body, "flag\nvalue") {
+		t.Errorf("expected -b value in body, got: %q", a.Body)
+	}
+	if strings.Contains(a.Body, "pipe content") {
+		t.Errorf("pipe content should be ignored when -b is given, got: %q", a.Body)
+	}
+}
+
 // TestNew_Body_Pipe verifies piped stdin is used as-is (no \n conversion) even without -b.
 func TestNew_Body_Pipe(t *testing.T) {
 	dir := t.TempDir()
@@ -178,11 +202,6 @@ func TestNew_Body_Pipe(t *testing.T) {
 // TestNew_NoPipeNoBody verifies that without -b and without piped stdin, body is empty.
 func TestNew_NoPipeNoBody(t *testing.T) {
 	dir := t.TempDir()
-
-	orig := isStdinPipe
-	isStdinPipe = func() bool { return false }
-	t.Cleanup(func() { isStdinPipe = orig })
-
 	out, path, err := runNewCmd(t, dir, []string{"-t", "No Body Post2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
@@ -305,10 +324,6 @@ func TestNew_NoArgs(t *testing.T) {
 
 // TestNew_ReadFromStdin_WithoutPipe verifies that stdin is not consumed when not piped.
 func TestNew_ReadFromStdin_WithoutPipe(t *testing.T) {
-	orig := isStdinPipe
-	isStdinPipe = func() bool { return false }
-	t.Cleanup(func() { isStdinPipe = orig })
-
 	dir := t.TempDir()
 	out, path, err := runNewCmd(t, dir, []string{"-t", "No Body Post"})
 	if err != nil {
