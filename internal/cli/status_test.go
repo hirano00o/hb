@@ -248,4 +248,66 @@ func TestRunStatus(t *testing.T) {
 			t.Errorf("expected Up to date (1), got %q", output)
 		}
 	})
+
+	t.Run("editUrl not found in remote treated as untracked", func(t *testing.T) {
+		dir := t.TempDir()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+			// Remote feed is empty — editUrl in local file has no match.
+			w.Write([]byte(buildStatusFeedXML("http://"+r.Host, nil)))
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		writeStatusMD(t, dir, "ghost.md", article.Frontmatter{
+			Title:   "Ghost Post",
+			Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+			EditURL: srv.URL + "/user/blog/atom/entry/999",
+		}, "body\n")
+
+		c := hatena.NewClient("user", "blog", "key")
+		c.SetBaseURL(srv.URL)
+
+		cmd, out, _ := newTestStatusCmd(t)
+		if err := runStatus(cmd, c, dir); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(out.String(), "Untracked (1):") {
+			t.Errorf("expected Untracked (1) for missing remote entry, got %q", out.String())
+		}
+	})
+
+	t.Run("no frontmatter file is skipped with warning", func(t *testing.T) {
+		dir := t.TempDir()
+		// File with no frontmatter delimiters — article.Read succeeds but Title and Date are zero.
+		writeMD(t, dir, "bare.md", "just a body without frontmatter\n")
+		writeStatusMD(t, dir, "valid.md", article.Frontmatter{
+			Title: "Valid Post",
+			Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+			Draft: true,
+		}, "body\n")
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(buildStatusFeedXML("http://"+r.Host, nil)))
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		c := hatena.NewClient("user", "blog", "key")
+		c.SetBaseURL(srv.URL)
+
+		cmd, out, errBuf := newTestStatusCmd(t)
+		if err := runStatus(cmd, c, dir); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(errBuf.String(), "warning:") {
+			t.Errorf("expected warning for bare.md in stderr, got %q", errBuf.String())
+		}
+		// valid.md has no editUrl → Untracked
+		if !strings.Contains(out.String(), "Untracked (1):") {
+			t.Errorf("expected Untracked (1) for valid.md, got %q", out.String())
+		}
+	})
 }

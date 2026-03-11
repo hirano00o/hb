@@ -40,6 +40,8 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string) error {
 		return nil
 	}
 
+	fmt.Fprintln(cmd.ErrOrStderr(), "Fetching remote entries...")
+
 	// Collect local articles, skipping unreadable or frontmatter-less files.
 	type localEntry struct {
 		path string
@@ -65,7 +67,6 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string) error {
 	}
 
 	// Fetch remote entries and build editURL → *Article map.
-	fmt.Fprintln(cmd.ErrOrStderr(), "Fetching remote entries...")
 	remoteEntries, err := client.ListEntries(cmd.Context(), 0)
 	if err != nil {
 		return err
