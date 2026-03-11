@@ -207,6 +207,34 @@ hb open 20260301_my-article.md
 
 frontmatter に `url` が設定されていない（未公開の）記事ではエラーになります。
 
+### `hb status`
+
+ローカル記事とリモートの同期状態を表示します。
+
+```sh
+hb status [--dir <directory>]
+```
+
+- `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
+
+各ローカルファイルを以下の 3 つに分類して表示します。
+
+- **Modified**: `editUrl` があり、ローカルとリモートの内容が異なる
+- **Untracked**: `editUrl` がない（未公開記事）
+- **Up to date**: ローカルとリモートが一致している
+
+```sh
+Modified (2):
+  20260301_Article1.md
+  20260302_Article2.md
+
+Untracked (1):
+  draft_NewPost.md
+
+Up to date (3):
+  20260201_OldPost.md
+  ...
+```
 
 ### `hb config init`
 
