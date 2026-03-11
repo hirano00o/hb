@@ -101,6 +101,27 @@ func TestRunList(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid frontmatter is skipped with warning", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "valid.md", "---\ntitle: Valid\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\n")
+		writeMD(t, dir, "bad.md", "---\ntitle: [broken\n")
+
+		var out, errBuf bytes.Buffer
+		cmd := &cobra.Command{}
+		cmd.SetOut(&out)
+		cmd.SetErr(&errBuf)
+
+		if err := runList(cmd, dir, false, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(errBuf.String(), "warning:") {
+			t.Errorf("expected warning in stderr, got %q", errBuf.String())
+		}
+		if !strings.Contains(out.String(), "Valid") {
+			t.Errorf("expected valid article in output, got %q", out.String())
+		}
+	})
+
 	t.Run("draft and published conflict", func(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(&bytes.Buffer{})

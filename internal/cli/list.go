@@ -45,6 +45,10 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool) erro
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v\n", f, err)
 			continue
 		}
+		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			continue
+		}
 		if draftOnly && !a.Frontmatter.Draft {
 			continue
 		}
