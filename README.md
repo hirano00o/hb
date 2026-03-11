@@ -172,6 +172,31 @@ cat body.md | hb new -t "はじめての記事"
 hb new --push -t "公開記事"
 ```
 
+### `hb list`
+
+ローカルの記事一覧をテーブル形式で表示します。日付の降順（新しい記事が上）でソートされます。
+
+```sh
+hb list [--dir <directory>] [--draft] [--published]
+```
+
+- `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
+- `--draft`: 下書きのみ表示
+- `--published`: 公開記事のみ表示
+
+`--draft` と `--published` は同時に指定できません。
+
+```sh
+# カレントディレクトリの全記事を表示
+hb list
+
+# 下書きのみ表示
+hb list --draft
+
+# 特定ディレクトリの公開記事のみ表示
+hb list --dir ./posts --published
+```
+
 ### `hb config init`
 
 プロジェクトローカル設定を対話形式で初期化します。空 Enter でスキップしたフィールドはファイルに書き込まれません。
