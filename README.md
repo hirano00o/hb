@@ -197,6 +197,17 @@ hb list --draft
 hb list --dir ./posts --published
 ```
 
+### `hb open <file>`
+
+指定したローカルファイルの公開URLをデフォルトブラウザで開きます。
+
+```sh
+hb open 20260301_my-article.md
+```
+
+frontmatter に `url` が設定されていない（未公開の）記事ではエラーになります。
+
+
 ### `hb config init`
 
 プロジェクトローカル設定を対話形式で初期化します。空 Enter でスキップしたフィールドはファイルに書き込まれません。
