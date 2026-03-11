@@ -2,9 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"net/url"
 	"os/exec"
 	"runtime"
-	"strings"
 
 	"github.com/hirano00o/hb/article"
 	"github.com/spf13/cobra"
@@ -42,8 +42,9 @@ func newOpenCmd() *cobra.Command {
 			if u == "" {
 				return fmt.Errorf("no URL found in %s: article may not be published yet", path)
 			}
-			if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
-				return fmt.Errorf("invalid URL %q: must start with http:// or https://", u)
+			parsed, err := url.Parse(u)
+			if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+				return fmt.Errorf("invalid URL %q: must be a valid http or https URL", u)
 			}
 
 			if err := openBrowser(u); err != nil {

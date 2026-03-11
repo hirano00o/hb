@@ -62,6 +62,20 @@ func TestRunOpen(t *testing.T) {
 		}
 	})
 
+	t.Run("error when URL has invalid scheme", func(t *testing.T) {
+		path := writeArticle(t, "---\ntitle: Test\nurl: ftp://example.com/entry\n---\nbody\n")
+		cmd := newOpenCmd()
+		cmd.SetArgs([]string{path})
+		cmd.SilenceUsage = true
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "invalid URL") {
+			t.Errorf("expected 'invalid URL' error, got: %v", err)
+		}
+	})
+
 	t.Run("error when file does not exist", func(t *testing.T) {
 		cmd := newOpenCmd()
 		cmd.SetArgs([]string{"/nonexistent/path/article.md"})
