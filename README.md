@@ -202,10 +202,20 @@ hb list --dir ./posts --published
 指定したローカルファイルの公開URLをデフォルトブラウザで開きます。
 
 ```sh
-hb open 20260301_my-article.md
+hb open [--edit|-e] <file>
 ```
 
-frontmatter に `url` が設定されていない（未公開の）記事ではエラーになります。
+- `--edit` / `-e`: はてなブログの編集ページ（`https://blog.hatena.ne.jp/{user}/{blog}/edit?entry={id}`）を開く
+
+```sh
+# 公開URLを開く
+hb open 20260301_my-article.md
+
+# はてなブログの編集ページを開く
+hb open --edit 20260301_my-article.md
+```
+
+frontmatter に `url`（または `--edit` 時は `editUrl`）が設定されていない（未公開の）記事ではエラーになります。
 
 ### `hb status`
 

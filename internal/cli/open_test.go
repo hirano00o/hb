@@ -95,7 +95,7 @@ func TestRunOpen(t *testing.T) {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if captured != "https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/123" {
+		if captured != "https://blog.hatena.ne.jp/user/example.hateblo.jp/edit?entry=123" {
 			t.Errorf("expected edit URL, got %q", captured)
 		}
 		if !strings.Contains(out.String(), "Opened:") {
