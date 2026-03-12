@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/hirano00o/hb/article"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func newOpenCmd() *cobra.Command {
 
 			u := a.Frontmatter.URL
 			if edit {
-				u = a.Frontmatter.EditURL
+				u = strings.Replace(a.Frontmatter.EditURL, "/atom/entry/", "/edit?entry=", 1)
 			}
 			if u == "" {
 				if edit {
