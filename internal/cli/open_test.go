@@ -76,6 +76,48 @@ func TestRunOpen(t *testing.T) {
 		}
 	})
 
+	t.Run("opens browser with edit URL when --edit flag is set", func(t *testing.T) {
+		orig := openBrowser
+		defer func() { openBrowser = orig }()
+
+		var captured string
+		openBrowser = func(u string) error {
+			captured = u
+			return nil
+		}
+
+		path := writeArticle(t, "---\ntitle: Test\nurl: https://example.com/entry/1\neditUrl: https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/123\n---\nbody\n")
+
+		cmd := newOpenCmd()
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetArgs([]string{"--edit", path})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if captured != "https://blog.hatena.ne.jp/user/example.hateblo.jp/atom/entry/123" {
+			t.Errorf("expected edit URL, got %q", captured)
+		}
+		if !strings.Contains(out.String(), "Opened:") {
+			t.Errorf("expected Opened message, got: %s", out.String())
+		}
+	})
+
+	t.Run("error when --edit flag is set but editUrl is empty", func(t *testing.T) {
+		path := writeArticle(t, "---\ntitle: Draft\nurl: https://example.com/entry/1\n---\nbody\n")
+
+		cmd := newOpenCmd()
+		cmd.SetArgs([]string{"--edit", path})
+		cmd.SilenceUsage = true
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "no edit URL found") {
+			t.Errorf("expected 'no edit URL found' error, got: %v", err)
+		}
+	})
+
 	t.Run("error when file does not exist", func(t *testing.T) {
 		cmd := newOpenCmd()
 		cmd.SetArgs([]string{"/nonexistent/path/article.md"})

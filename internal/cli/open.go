@@ -27,7 +27,8 @@ func defaultOpenBrowser(url string) error {
 }
 
 func newOpenCmd() *cobra.Command {
-	return &cobra.Command{
+	var edit bool
+	cmd := &cobra.Command{
 		Use:   "open <file>",
 		Short: "Open the article in the default browser",
 		Args:  cobra.ExactArgs(1),
@@ -39,7 +40,13 @@ func newOpenCmd() *cobra.Command {
 			}
 
 			u := a.Frontmatter.URL
+			if edit {
+				u = a.Frontmatter.EditURL
+			}
 			if u == "" {
+				if edit {
+					return fmt.Errorf("no edit URL found in %s: article may not be published yet", path)
+				}
 				return fmt.Errorf("no URL found in %s: article may not be published yet", path)
 			}
 			parsed, err := url.Parse(u)
@@ -54,4 +61,6 @@ func newOpenCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVarP(&edit, "edit", "e", false, "Open the edit page instead of the public URL")
+	return cmd
 }
