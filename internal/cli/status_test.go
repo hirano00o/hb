@@ -78,7 +78,7 @@ func TestRunStatus(t *testing.T) {
 		c := hatena.NewClient("user", "blog", "key")
 		c.SetBaseURL(srv.URL)
 
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if out.String() != "No articles found.\n" {
@@ -104,7 +104,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Untracked (1):") {
@@ -142,7 +142,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Modified (1):") {
@@ -183,7 +183,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Up to date (1):") {
@@ -234,7 +234,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		output := out.String()
@@ -270,7 +270,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Untracked (1):") {
@@ -299,7 +299,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, errBuf := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(errBuf.String(), "warning:") {

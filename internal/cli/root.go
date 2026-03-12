@@ -5,6 +5,8 @@ import "github.com/spf13/cobra"
 
 const version = "v0.1.0"
 
+var verbose bool
+
 // NewRootCmd builds and returns the root cobra command with all subcommands attached.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
@@ -12,6 +14,8 @@ func NewRootCmd() *cobra.Command {
 		Short:   "Hatena Blog management CLI",
 		Version: version,
 	}
+
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show verbose output including skipped-file warnings")
 
 	configCmd := &cobra.Command{
 		Use:   "config",

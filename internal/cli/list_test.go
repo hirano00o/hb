@@ -25,7 +25,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if buf.String() != "No articles found.\n" {
@@ -43,7 +43,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -67,7 +67,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, true, false); err != nil {
+		if err := runList(cmd, dir, true, false, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -89,7 +89,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, true); err != nil {
+		if err := runList(cmd, dir, false, true, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -111,7 +111,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&out)
 		cmd.SetErr(&errBuf)
 
-		if err := runList(cmd, dir, false, false); err != nil {
+		if err := runList(cmd, dir, false, false, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(errBuf.String(), "warning:") {
@@ -127,7 +127,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), true, true)
+		err := runList(cmd, t.TempDir(), true, true, false)
 		if err == nil {
 			t.Fatal("expected error for --draft + --published")
 		}

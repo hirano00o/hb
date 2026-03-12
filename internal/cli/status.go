@@ -21,7 +21,7 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runStatus(cmd, client, dir)
+			return runStatus(cmd, client, dir, verbose)
 		},
 	}
 
@@ -29,7 +29,7 @@ func newStatusCmd() *cobra.Command {
 	return cmd
 }
 
-func runStatus(cmd *cobra.Command, client *hatena.Client, dir string) error {
+func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnings bool) error {
 	files, err := globMD(dir)
 	if err != nil {
 		return err
@@ -51,11 +51,15 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string) error {
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v\n", f, err)
+			if showWarnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
+			}
 			continue
 		}
 		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			if showWarnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			}
 			continue
 		}
 		locals = append(locals, localEntry{path: f, art: a})
@@ -94,12 +98,12 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string) error {
 		}
 		localStr, err := articleToString(l.art)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to render %s: %v\n", l.path, err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "error: failed to render %s: %v; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues\n", l.path, err)
 			continue
 		}
 		remoteStr, err := articleToString(remote)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to render remote entry for %s: %v\n", l.path, err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "error: failed to render remote entry for %s: %v; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues\n", l.path, err)
 			continue
 		}
 		if localStr != remoteStr {

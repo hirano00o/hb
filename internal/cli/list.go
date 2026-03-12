@@ -18,7 +18,7 @@ func newListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List local articles",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd, dir, draftOnly, publishedOnly)
+			return runList(cmd, dir, draftOnly, publishedOnly, verbose)
 		},
 	}
 
@@ -28,7 +28,7 @@ func newListCmd() *cobra.Command {
 	return cmd
 }
 
-func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool) error {
+func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, showWarnings bool) error {
 	if draftOnly && publishedOnly {
 		return fmt.Errorf("--draft and --published cannot be used together")
 	}
@@ -42,11 +42,15 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool) erro
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v\n", f, err)
+			if showWarnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
+			}
 			continue
 		}
 		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			if showWarnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			}
 			continue
 		}
 		if draftOnly && !a.Frontmatter.Draft {
