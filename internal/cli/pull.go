@@ -69,7 +69,7 @@ func newPullCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "On filename conflict, auto-rename with millisecond suffix instead of prompting")
-	cmd.Flags().StringVar(&dir, "dir", "", "Directory to save files (default: current directory)")
+	cmd.Flags().StringVar(&dir, "dir", ".", "Directory to save files")
 	cmd.Flags().StringVar(&fromStr, "from", "", "Filter entries published on or after this date (YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd)")
 	cmd.Flags().StringVar(&toStr, "to", "", "Filter entries published on or before this date (YYYY-mm-dd, YYYY/mm/dd, or YYYYmmdd)")
 	return cmd
