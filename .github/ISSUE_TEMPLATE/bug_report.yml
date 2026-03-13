@@ -1,5 +1,6 @@
 name: バグ報告
 description: 予期しない動作や不具合を報告する
+title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown
@@ -43,11 +44,14 @@ body:
     id: actual
     attributes:
       label: 実際の動作
-      description: 実際に何が起きたか説明してください。エラーメッセージや出力があれば貼り付けてください。
+      description: |
+        実際に何が起きたか説明してください。エラーメッセージや出力があれば
+        コードブロック（` ``` ` で囲む）に貼り付けてください。
       placeholder: |
-        例）以下のエラーが出力される:
+        以下のエラーが出力される:
+        ```
         panic: runtime error: ...
-      render: shell
+        ```
     validations:
       required: true
 
