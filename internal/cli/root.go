@@ -3,7 +3,9 @@ package cli
 
 import "github.com/spf13/cobra"
 
-const version = "v0.1.0"
+// version is set at build time via -ldflags "-X github.com/hirano00o/hb/internal/cli.version=<ver>".
+// It defaults to "dev" for local builds.
+var version = "dev"
 
 // NewRootCmd builds and returns the root cobra command with all subcommands attached.
 func NewRootCmd() *cobra.Command {

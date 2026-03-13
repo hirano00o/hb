@@ -17,7 +17,8 @@ func TestVersionFlag(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := "hb version v0.1.0\n"
+	// version defaults to "dev" unless injected via -ldflags at build time.
+	want := "hb version dev\n"
 	if got := buf.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
