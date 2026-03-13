@@ -1,0 +1,95 @@
+name: バグ報告
+description: 予期しない動作や不具合を報告する
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグ報告ありがとうございます。再現・調査に必要な情報をご記入ください。
+        APIキーなどの機密情報は必ずマスクしてから投稿してください。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: バグの概要
+      description: 何が起きているか簡潔に説明してください。
+      placeholder: 例）`hb push` を実行すると panic が発生する
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: バグを再現するための手順を記載してください。
+      placeholder: |
+        1. `hb pull` で記事を取得する
+        2. 記事ファイルを編集する
+        3. `hb push <file>` を実行する
+        4. エラーが発生する
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+      description: 本来どのような動作になるべきか説明してください。
+      placeholder: 例）記事が正常にアップロードされる
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: |
+        実際に何が起きたか説明してください。エラーメッセージや出力があれば
+        コードブロック（` ``` ` で囲む）に貼り付けてください。
+      placeholder: |
+        以下のエラーが出力される:
+        ```
+        panic: runtime error: ...
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境情報
+      description: 使用している環境を記入してください。
+      placeholder: |
+        - OS: macOS 14.x / Ubuntu 24.04 / Windows 11 など
+        - hb バージョン: (hb --version の出力)
+        - Go バージョン: (go version の出力)
+      value: |
+        - OS:
+        - hb バージョン:
+        - Go バージョン:
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 設定情報（任意）
+      description: |
+        関連する設定があれば `.hb/config.yaml` の内容を貼り付けてください。
+        **APIキーなどの機密情報は必ず `***` に置き換えてください。**
+      placeholder: |
+        hatena_id: your-id
+        blog_id: your-blog.hatenablog.com
+        api_key: "***"
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 追加情報（任意）
+      description: その他、調査に役立ちそうな情報があれば記載してください。
+    validations:
+      required: false
