@@ -13,6 +13,8 @@ func NewRootCmd() *cobra.Command {
 		Version: version,
 	}
 
+	root.PersistentFlags().Bool("verbose", false, "Show verbose output including skipped-file warnings")
+
 	configCmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage hb configuration",

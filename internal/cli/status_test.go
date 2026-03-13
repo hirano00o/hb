@@ -78,7 +78,7 @@ func TestRunStatus(t *testing.T) {
 		c := hatena.NewClient("user", "blog", "key")
 		c.SetBaseURL(srv.URL)
 
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if out.String() != "No articles found.\n" {
@@ -104,7 +104,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Untracked (1):") {
@@ -142,7 +142,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Modified (1):") {
@@ -183,7 +183,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Up to date (1):") {
@@ -234,7 +234,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		output := out.String()
@@ -270,11 +270,39 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, _ := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(out.String(), "Untracked (1):") {
 			t.Errorf("expected Untracked (1) for missing remote entry, got %q", out.String())
+		}
+	})
+
+	t.Run("no frontmatter warning is suppressed by default", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "bare.md", "just a body without frontmatter\n")
+		writeStatusMD(t, dir, "valid.md", article.Frontmatter{
+			Title: "Valid Post",
+			Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+			Draft: true,
+		}, "body\n")
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(buildStatusFeedXML("http://"+r.Host, nil)))
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		c := hatena.NewClient("user", "blog", "key")
+		c.SetBaseURL(srv.URL)
+
+		cmd, _, errBuf := newTestStatusCmd(t)
+		if err := runStatus(cmd, c, dir, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(errBuf.String(), "warning: skipping") {
+			t.Errorf("expected no per-file warning without verbose, got %q", errBuf.String())
 		}
 	})
 
@@ -299,7 +327,7 @@ func TestRunStatus(t *testing.T) {
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, errBuf := newTestStatusCmd(t)
-		if err := runStatus(cmd, c, dir); err != nil {
+		if err := runStatus(cmd, c, dir, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(errBuf.String(), "warning:") {

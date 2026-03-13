@@ -18,7 +18,8 @@ func newListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List local articles",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd, dir, draftOnly, publishedOnly)
+			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
+			return runList(cmd, dir, draftOnly, publishedOnly, v)
 		},
 	}
 
@@ -28,7 +29,7 @@ func newListCmd() *cobra.Command {
 	return cmd
 }
 
-func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool) error {
+func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, showWarnings bool) error {
 	if draftOnly && publishedOnly {
 		return fmt.Errorf("--draft and --published cannot be used together")
 	}
@@ -39,14 +40,20 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool) erro
 	}
 
 	var articles []*article.Article
+	var readErrCount int
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v\n", f, err)
+			readErrCount++
+			if showWarnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
+			}
 			continue
 		}
 		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			if showWarnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
+			}
 			continue
 		}
 		if draftOnly && !a.Frontmatter.Draft {
@@ -56,6 +63,10 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool) erro
 			continue
 		}
 		articles = append(articles, a)
+	}
+
+	if readErrCount > 0 && !showWarnings {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
 	}
 
 	if len(articles) == 0 {

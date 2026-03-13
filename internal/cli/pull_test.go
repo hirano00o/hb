@@ -330,7 +330,7 @@ func TestRunPull_Integration(t *testing.T) {
 			c.SetBaseURL(srv.URL)
 
 			cmd, _ := newTestPullCmd(t)
-			if err := runPull(cmd, c, dir, tt.force, time.Time{}, time.Time{}, tt.concurrency, tt.maxPages); err != nil {
+			if err := runPull(cmd, c, dir, tt.force, time.Time{}, time.Time{}, tt.concurrency, tt.maxPages, false); err != nil {
 				t.Fatalf("runPull error: %v", err)
 			}
 

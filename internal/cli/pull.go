@@ -63,7 +63,8 @@ func newPullCmd() *cobra.Command {
 			}
 
 			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
-			return runPull(cmd, client, dir, force, from, to, concurrency, maxPages)
+			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
+			return runPull(cmd, client, dir, force, from, to, concurrency, maxPages, v)
 		},
 	}
 
@@ -74,7 +75,7 @@ func newPullCmd() *cobra.Command {
 	return cmd
 }
 
-func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, from, to time.Time, concurrency, maxPages int) error {
+func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, from, to time.Time, concurrency, maxPages int, showWarnings bool) error {
 	ctx := cmd.Context()
 
 	entries, err := client.ListEntries(ctx, maxPages)
@@ -85,7 +86,7 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 	entries = filterEntriesByDate(entries, from, to)
 
 	// Build a set of known editUrls from local files to skip already-fetched entries.
-	knownEditURLs, err := collectLocalEditURLs(dir, cmd.ErrOrStderr())
+	knownEditURLs, err := collectLocalEditURLs(dir, cmd.ErrOrStderr(), showWarnings)
 	if err != nil {
 		return err
 	}
@@ -230,22 +231,30 @@ func autoRename(path string) string {
 }
 
 // collectLocalEditURLs walks the given directory recursively and collects all editUrl values
-// found in frontmatter of .md files. Unreadable files are skipped with a warning to w.
-func collectLocalEditURLs(dir string, w io.Writer) (map[string]struct{}, error) {
+// found in frontmatter of .md files. Unreadable files are skipped; when showWarnings is true
+// a per-file warning is written to w, otherwise a summary count is emitted instead.
+func collectLocalEditURLs(dir string, w io.Writer, showWarnings bool) (map[string]struct{}, error) {
 	known := map[string]struct{}{}
 	files, err := globMD(dir)
 	if err != nil {
 		return known, err
 	}
+	var readErrCount int
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
-			fmt.Fprintf(w, "warning: skipping %s: %v\n", f, err)
+			readErrCount++
+			if showWarnings {
+				fmt.Fprintf(w, "warning: failed to read %s: %v (skipping)\n", f, err)
+			}
 			continue
 		}
 		if a.Frontmatter.EditURL != "" {
 			known[a.Frontmatter.EditURL] = struct{}{}
 		}
+	}
+	if readErrCount > 0 && !showWarnings {
+		fmt.Fprintf(w, "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
 	}
 	return known, nil
 }
