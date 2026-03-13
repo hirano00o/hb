@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -119,6 +121,44 @@ func TestSync_WithDifferences_Confirm(t *testing.T) {
 	}
 	if a.Body != "remote body\n" {
 		t.Errorf("expected body 'remote body\\n', got: %q", a.Body)
+	}
+}
+
+// TestGlobMD_SkipsHiddenDirs verifies that globMD skips directories whose names start with ".".
+func TestGlobMD_SkipsHiddenDirs(t *testing.T) {
+	root := t.TempDir()
+
+	// Files that should be included.
+	mustCreate := func(path string) {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+	mustCreate(filepath.Join(root, "visible.md"))
+	mustCreate(filepath.Join(root, "subdir", "nested.md"))
+	// Files that should be excluded (inside hidden directories).
+	mustCreate(filepath.Join(root, ".hidden", "secret.md"))
+	mustCreate(filepath.Join(root, ".git", "config.md"))
+
+	got, err := globMD(root)
+	if err != nil {
+		t.Fatalf("globMD: %v", err)
+	}
+
+	want := map[string]bool{
+		filepath.Join(root, "visible.md"):        true,
+		filepath.Join(root, "subdir", "nested.md"): true,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d files, got %d: %v", len(want), len(got), got)
+	}
+	for _, f := range got {
+		if !want[f] {
+			t.Errorf("unexpected file in result: %s", f)
+		}
 	}
 }
 
