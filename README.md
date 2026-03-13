@@ -116,6 +116,10 @@ hb pull [--force|-f] [--dir <directory>] [--from <date>] [--to <date>]
 hb sync 20260301_my-article.md
 ```
 
+| フラグ | 短縮 | 説明 |
+|--------|------|------|
+| `--yes` | `-y` | 確認プロンプトをスキップして上書き |
+
 ### `hb push <file>`
 
 ローカルファイルをリモートへ送信します。

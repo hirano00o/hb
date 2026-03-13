@@ -11,7 +11,9 @@ import (
 )
 
 func newSyncCmd() *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+
+	cmd := &cobra.Command{
 		Use:   "sync <file>",
 		Short: "Sync the remote version of an entry to the local file",
 		Args:  cobra.ExactArgs(1),
@@ -46,13 +48,15 @@ func newSyncCmd() *cobra.Command {
 			}
 			fmt.Fprint(cmd.OutOrStdout(), diff)
 
-			ok, err := confirmAction(cmd, "Overwrite local file? [y/N]: ")
-			if err != nil {
-				return err
-			}
-			if !ok {
-				fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-				return nil
+			if !yes {
+				ok, err := confirmAction(cmd, "Overwrite local file? [y/N]: ")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+					return nil
+				}
 			}
 			if err := article.Write(path, remoteArticle); err != nil {
 				return err
@@ -61,6 +65,9 @@ func newSyncCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
+	return cmd
 }
 
 // globMD returns all .md files under root (recursively), skipping hidden directories.
