@@ -135,31 +135,55 @@ func TestGlobMD_Empty(t *testing.T) {
 
 // TestCollectLocalEditURLs verifies editUrl collection and warning output for unreadable files.
 func TestCollectLocalEditURLs(t *testing.T) {
-	dir := t.TempDir()
+	const validContent = "---\ntitle: Test\ndate: 2026-03-01T00:00:00Z\neditUrl: https://example.com/entry/1\n---\nbody\n"
+	const badContent = "---\ntitle: [broken\n"
 
-	// valid article with editUrl
-	validContent := "---\ntitle: Test\ndate: 2026-03-01T00:00:00Z\neditUrl: https://example.com/entry/1\n---\nbody\n"
-	if err := os.WriteFile(filepath.Join(dir, "valid.md"), []byte(validContent), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("verbose shows per-file warning", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "valid.md"), []byte(validContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "bad.md"), []byte(badContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
 
-	// malformed frontmatter (unreadable as article)
-	badContent := "---\ntitle: [broken\n"
-	if err := os.WriteFile(filepath.Join(dir, "bad.md"), []byte(badContent), 0o644); err != nil {
-		t.Fatal(err)
-	}
+		var buf bytes.Buffer
+		known, err := collectLocalEditURLs(dir, &buf, true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := known["https://example.com/entry/1"]; !ok {
+			t.Errorf("expected editUrl to be collected, got %v", known)
+		}
+		if !strings.Contains(buf.String(), "warning: failed to read") {
+			t.Errorf("expected per-file warning with verbose, got %q", buf.String())
+		}
+	})
 
-	var buf bytes.Buffer
-	known, err := collectLocalEditURLs(dir, &buf)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok := known["https://example.com/entry/1"]; !ok {
-		t.Errorf("expected editUrl to be collected, got %v", known)
-	}
-	if !strings.Contains(buf.String(), "warning:") {
-		t.Errorf("expected warning for bad.md, got %q", buf.String())
-	}
+	t.Run("no verbose shows summary only", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "valid.md"), []byte(validContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "bad.md"), []byte(badContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		var buf bytes.Buffer
+		known, err := collectLocalEditURLs(dir, &buf, false)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := known["https://example.com/entry/1"]; !ok {
+			t.Errorf("expected editUrl to be collected, got %v", known)
+		}
+		if strings.Contains(buf.String(), "failed to read") {
+			t.Errorf("expected no per-file warning without verbose, got %q", buf.String())
+		}
+		if !strings.Contains(buf.String(), "1 file(s) skipped due to read errors") {
+			t.Errorf("expected summary warning without verbose, got %q", buf.String())
+		}
+	})
 }
 
 // TestConfirmAction verifies confirmAction returns the correct boolean for various inputs.

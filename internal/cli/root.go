@@ -13,7 +13,7 @@ func NewRootCmd() *cobra.Command {
 		Version: version,
 	}
 
-	root.PersistentFlags().BoolP("verbose", "v", false, "Show verbose output including skipped-file warnings")
+	root.PersistentFlags().Bool("verbose", false, "Show verbose output including skipped-file warnings")
 
 	configCmd := &cobra.Command{
 		Use:   "config",
