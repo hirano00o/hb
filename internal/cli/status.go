@@ -21,7 +21,8 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runStatus(cmd, client, dir, verbose)
+			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
+			return runStatus(cmd, client, dir, v)
 		},
 	}
 
@@ -48,9 +49,11 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnin
 		art  *article.Article
 	}
 	var locals []localEntry
+	var readErrCount int
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
+			readErrCount++
 			if showWarnings {
 				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
 			}
@@ -63,6 +66,10 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnin
 			continue
 		}
 		locals = append(locals, localEntry{path: f, art: a})
+	}
+
+	if readErrCount > 0 && !showWarnings {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
 	}
 
 	if len(locals) == 0 {
@@ -98,13 +105,11 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnin
 		}
 		localStr, err := articleToString(l.art)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "error: failed to render %s: %v; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues\n", l.path, err)
-			continue
+			return fmt.Errorf("failed to render %s: %w; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues", l.path, err)
 		}
 		remoteStr, err := articleToString(remote)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "error: failed to render remote entry for %s: %v; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues\n", l.path, err)
-			continue
+			return fmt.Errorf("failed to render remote entry for %s: %w; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues", l.path, err)
 		}
 		if localStr != remoteStr {
 			modified = append(modified, l.path)

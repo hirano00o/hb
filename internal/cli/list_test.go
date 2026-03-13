@@ -10,6 +10,47 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func TestListCmd_VerboseFlag(t *testing.T) {
+	t.Run("verbose shows per-file warning", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "bad.md", "---\ntitle: [broken\n")
+
+		root := NewRootCmd()
+		var errBuf bytes.Buffer
+		root.SetErr(&errBuf)
+		root.SetOut(&bytes.Buffer{})
+		root.SetArgs([]string{"list", "--dir", dir, "--verbose"})
+
+		if err := root.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(errBuf.String(), "warning:") {
+			t.Errorf("expected warning on stderr with --verbose, got %q", errBuf.String())
+		}
+	})
+
+	t.Run("no verbose shows summary only", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "bad.md", "---\ntitle: [broken\n")
+
+		root := NewRootCmd()
+		var errBuf bytes.Buffer
+		root.SetErr(&errBuf)
+		root.SetOut(&bytes.Buffer{})
+		root.SetArgs([]string{"list", "--dir", dir})
+
+		if err := root.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(errBuf.String(), "failed to read") {
+			t.Errorf("expected no per-file warning without --verbose, got %q", errBuf.String())
+		}
+		if !strings.Contains(errBuf.String(), "1 file(s) skipped due to read errors") {
+			t.Errorf("expected summary warning without --verbose, got %q", errBuf.String())
+		}
+	})
+}
+
 func writeMD(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
@@ -116,6 +157,30 @@ func TestRunList(t *testing.T) {
 		}
 		if !strings.Contains(errBuf.String(), "warning:") {
 			t.Errorf("expected warning in stderr, got %q", errBuf.String())
+		}
+		if !strings.Contains(out.String(), "Valid") {
+			t.Errorf("expected valid article in output, got %q", out.String())
+		}
+	})
+
+	t.Run("read error is suppressed without verbose", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "bad.md", "---\ntitle: [broken\n")
+		writeMD(t, dir, "valid.md", "---\ntitle: Valid\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\n")
+
+		var out, errBuf bytes.Buffer
+		cmd := &cobra.Command{}
+		cmd.SetOut(&out)
+		cmd.SetErr(&errBuf)
+
+		if err := runList(cmd, dir, false, false, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(errBuf.String(), "failed to read") {
+			t.Errorf("expected no per-file warning without verbose, got %q", errBuf.String())
+		}
+		if !strings.Contains(errBuf.String(), "1 file(s) skipped due to read errors") {
+			t.Errorf("expected summary warning without verbose, got %q", errBuf.String())
 		}
 		if !strings.Contains(out.String(), "Valid") {
 			t.Errorf("expected valid article in output, got %q", out.String())

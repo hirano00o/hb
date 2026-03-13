@@ -18,7 +18,8 @@ func newListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List local articles",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd, dir, draftOnly, publishedOnly, verbose)
+			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
+			return runList(cmd, dir, draftOnly, publishedOnly, v)
 		},
 	}
 
@@ -39,9 +40,11 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, show
 	}
 
 	var articles []*article.Article
+	var readErrCount int
 	for _, f := range files {
 		a, err := article.Read(f)
 		if err != nil {
+			readErrCount++
 			if showWarnings {
 				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
 			}
@@ -60,6 +63,10 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, show
 			continue
 		}
 		articles = append(articles, a)
+	}
+
+	if readErrCount > 0 && !showWarnings {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
 	}
 
 	if len(articles) == 0 {
