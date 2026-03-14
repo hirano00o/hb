@@ -139,9 +139,13 @@ func TestGlobMD_SkipsHiddenDirs(t *testing.T) {
 	}
 	mustCreate(filepath.Join(root, "visible.md"))
 	mustCreate(filepath.Join(root, "subdir", "nested.md"))
+	// A dot-prefixed file (not a directory) must NOT be skipped.
+	mustCreate(filepath.Join(root, ".dotfile.md"))
 	// Files that should be excluded (inside hidden directories).
 	mustCreate(filepath.Join(root, ".hidden", "secret.md"))
 	mustCreate(filepath.Join(root, ".git", "config.md"))
+	// A hidden directory nested inside a visible subdirectory must also be excluded.
+	mustCreate(filepath.Join(root, "subdir", ".cache", "x.md"))
 
 	got, err := globMD(root)
 	if err != nil {
@@ -149,8 +153,9 @@ func TestGlobMD_SkipsHiddenDirs(t *testing.T) {
 	}
 
 	want := map[string]bool{
-		filepath.Join(root, "visible.md"):        true,
+		filepath.Join(root, "visible.md"):          true,
 		filepath.Join(root, "subdir", "nested.md"): true,
+		filepath.Join(root, ".dotfile.md"):          true,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("expected %d files, got %d: %v", len(want), len(got), got)
