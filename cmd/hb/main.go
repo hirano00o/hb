@@ -16,6 +16,10 @@ func main() {
 	root := cli.NewRootCmd()
 	root.SetContext(ctx)
 	if err := root.Execute(); err != nil {
+		if ctx.Err() != nil {
+			// SIGINT/SIGTERM: exit 130 without printing error (context cancellation is expected)
+			os.Exit(130)
+		}
 		os.Exit(1)
 	}
 }
