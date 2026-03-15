@@ -105,12 +105,17 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 		interactMu sync.Mutex
 	)
 
-	var eg errgroup.Group
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(concurrency)
 
 	for _, e := range toProcess {
 		e := e
 		eg.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
 			a := article.FromEntry(e)
 			filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
 			path := filepath.Join(dir, filename)
