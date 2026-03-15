@@ -63,7 +63,7 @@ func newSyncCmd() *cobra.Command {
 	}
 }
 
-// globMD returns all .md files under root (recursively).
+// globMD returns all .md files under root (recursively), skipping hidden directories.
 func globMD(root string) ([]string, error) {
 	if root == "" {
 		root = "."
@@ -72,6 +72,9 @@ func globMD(root string) ([]string, error) {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.IsDir() && strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
+			return fs.SkipDir
 		}
 		if !d.IsDir() && strings.HasSuffix(path, ".md") {
 			files = append(files, path)
