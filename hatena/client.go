@@ -182,3 +182,16 @@ func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*En
 	}
 	return parseEntry(data)
 }
+
+// DeleteEntry deletes the remote entry identified by editURL.
+func (c *Client) DeleteEntry(ctx context.Context, editURL string) error {
+	resp, err := c.do(ctx, http.MethodDelete, editURL, nil)
+	if err != nil {
+		return err
+	}
+	data, err := readBody(resp)
+	if err != nil {
+		return err
+	}
+	return checkStatus(resp, data)
+}
