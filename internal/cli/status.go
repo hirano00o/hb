@@ -103,15 +103,7 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnin
 			untracked = append(untracked, l.path)
 			continue
 		}
-		localStr, err := articleToString(l.art)
-		if err != nil {
-			return fmt.Errorf("failed to render %s: %w; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues", l.path, err)
-		}
-		remoteStr, err := articleToString(remote)
-		if err != nil {
-			return fmt.Errorf("failed to render remote entry for %s: %w; this is unexpected, please report a bug at https://github.com/hirano00o/hb/issues", l.path, err)
-		}
-		if localStr != remoteStr {
+		if hasChanges(l.art, remote) {
 			modified = append(modified, l.path)
 		} else {
 			upToDate = append(upToDate, l.path)
