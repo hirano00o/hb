@@ -104,6 +104,9 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnin
 			continue
 		}
 		if hasChanges(l.art, remote) {
+			if article.HasLocalImages(l.art.Body) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "note: %s contains local images; diff may not be accurate until pushed\n", filepath.Base(l.path))
+			}
 			modified = append(modified, l.path)
 		} else {
 			upToDate = append(upToDate, l.path)

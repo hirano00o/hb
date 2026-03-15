@@ -17,6 +17,20 @@ type ImageUploader func(ctx context.Context, filePath string) (string, error)
 //	![alt](path "title")
 var imageRegexp = regexp.MustCompile(`!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)`)
 
+// HasLocalImages reports whether body contains any local (non-http/https) image references.
+func HasLocalImages(body string) bool {
+	for _, sub := range imageRegexp.FindAllStringSubmatch(body, -1) {
+		if len(sub) < 3 {
+			continue
+		}
+		path := sub[2]
+		if !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
+			return true
+		}
+	}
+	return false
+}
+
 // ReplaceLocalImages scans body for Markdown image references and replaces
 // local file paths (those not starting with http:// or https://) with the
 // hatena:syntax value returned by uploader. Remote URLs are left unchanged.

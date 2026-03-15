@@ -73,6 +73,48 @@ func TestDiff_NoDifferences(t *testing.T) {
 	}
 }
 
+// TestDiff_LocalImageNote verifies that diff prints a note to stderr when the local article
+// contains a local image reference.
+func TestDiff_LocalImageNote(t *testing.T) {
+	const entryID = "20"
+	var srvURL string
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/"+entryID, func(w http.ResponseWriter, r *http.Request) {
+		editHref := srvURL + "/user/example.hateblo.jp/atom/entry/" + entryID
+		writeEntryXMLFull(w, "Title", "remote body\n", false, editHref, "https://example.com/entry/"+entryID)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	srvURL = srv.URL
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srvURL + "/user/example.hateblo.jp/atom/entry/" + entryID
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/" + entryID,
+	}
+	path, _ := setupPushTest(t, editURL, fm, "![alt](photo.jpg)\n")
+
+	cmd := newDiffCmd()
+	var out, errBuf bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("diff failed: %v", err)
+	}
+	if !strings.Contains(errBuf.String(), "note:") || !strings.Contains(errBuf.String(), "local images") {
+		t.Errorf("expected local-image note in stderr, got %q", errBuf.String())
+	}
+}
+
 // TestDiff_WithDifferences verifies that diff outputs a unified diff when content differs.
 func TestDiff_WithDifferences(t *testing.T) {
 	mux := http.NewServeMux()

@@ -278,6 +278,41 @@ func TestRunStatus(t *testing.T) {
 		}
 	})
 
+	t.Run("local image note emitted to stderr", func(t *testing.T) {
+		dir := t.TempDir()
+		var srvURL string
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+			base := "http://" + r.Host
+			entries := []statusEntry{
+				{id: "5", title: "Image Post", content: "body\n"},
+			}
+			w.Write([]byte(buildStatusFeedXML(base, entries)))
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+		srvURL = srv.URL
+
+		editURL := srvURL + "/user/blog/atom/entry/5"
+		writeStatusMD(t, dir, "img.md", article.Frontmatter{
+			Title:   "Image Post",
+			Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+			EditURL: editURL,
+		}, "![alt](photo.jpg)\n")
+
+		c := hatena.NewClient("user", "blog", "key")
+		c.SetBaseURL(srvURL)
+
+		cmd, _, errBuf := newTestStatusCmd(t)
+		if err := runStatus(cmd, c, dir, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(errBuf.String(), "note:") || !strings.Contains(errBuf.String(), "local images") {
+			t.Errorf("expected local-image note in stderr, got %q", errBuf.String())
+		}
+	})
+
 	t.Run("no frontmatter warning is suppressed by default", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMD(t, dir, "bare.md", "just a body without frontmatter\n")
