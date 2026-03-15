@@ -22,6 +22,7 @@ func NewRootCmd() *cobra.Command {
 		Short: "Manage hb configuration",
 	}
 	configCmd.AddCommand(newConfigInitCmd())
+	configCmd.AddCommand(newConfigShowCmd())
 	root.AddCommand(configCmd)
 
 	root.AddCommand(newPullCmd())
