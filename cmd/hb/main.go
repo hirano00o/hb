@@ -17,7 +17,10 @@ func main() {
 	root.SetContext(ctx)
 	if err := root.Execute(); err != nil {
 		if ctx.Err() != nil {
-			// SIGINT/SIGTERM: exit 130 without printing error (context cancellation is expected)
+			// Interrupted by SIGINT or SIGTERM; exit 130 (128+SIGINT) as a
+			// conventional non-zero exit code for signal-driven termination.
+			// signal.NotifyContext does not expose the specific signal received,
+			// so we use 130 for both. This is acceptable for an interactive CLI.
 			os.Exit(130)
 		}
 		os.Exit(1)
