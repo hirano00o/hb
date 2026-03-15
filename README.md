@@ -113,6 +113,12 @@ hb pull [--force|-f] [--dir <directory>] [--from <date>] [--to <date>]
 指定したローカルファイルのリモート最新版を取得します。差分を表示してから上書き確認します。
 
 ```sh
+hb sync [--yes|-y] <file>
+```
+
+- `--yes` / `-y`: 確認プロンプトをスキップして上書き
+
+```sh
 hb sync 20260301_my-article.md
 ```
 

@@ -215,3 +215,56 @@ func TestSync_WithDifferences_Abort(t *testing.T) {
 		t.Errorf("expected body 'local body\\n' unchanged, got: %q", a.Body)
 	}
 }
+
+// TestSync_WithDifferences_YesFlag verifies that --yes skips the confirmation prompt and overwrites
+// the local file with remote content directly, while still showing the diff.
+func TestSync_WithDifferences_YesFlag(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/23", func(w http.ResponseWriter, r *http.Request) {
+		writeEntryXMLFull(w, "Title", "remote body\n", false,
+			fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/23", r.Host),
+			"https://example.com/entry/23")
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/23"
+	fm := article.Frontmatter{
+		Title:   "Title",
+		Date:    time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:   false,
+		EditURL: editURL,
+		URL:     "https://example.com/entry/23",
+	}
+	path, _ := setupPushTest(t, editURL, fm, "local body\n")
+
+	cmd := newSyncCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--yes", path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("sync failed: %v\noutput: %s", err, out.String())
+	}
+
+	// diff should still be shown even with --yes
+	if !strings.Contains(out.String(), "---") {
+		t.Error("expected diff output even with --yes flag")
+	}
+
+	if !strings.Contains(out.String(), "Updated: "+path) {
+		t.Errorf("expected 'Updated: %s' in output, got: %s", path, out.String())
+	}
+
+	// Verify the file was overwritten with remote content without any prompt interaction.
+	a, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read after sync: %v", err)
+	}
+	if a.Body != "remote body\n" {
+		t.Errorf("expected body 'remote body\\n', got: %q", a.Body)
+	}
+}
