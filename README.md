@@ -273,6 +273,24 @@ Up to date (3):
 
 `-g` フラグでグローバル設定を初期化します（全フィールドの入力が必須）。
 
+### `hb config show`
+
+現在の有効な設定値を表示します（グローバル設定 → プロジェクト設定 → 環境変数の優先順でマージ済みの値）。
+
+```sh
+hb config show
+```
+
+API キーは末尾4文字のみ表示され、残りは `*` でマスクされます。未設定のフィールドはデフォルト値とともに表示されます。
+
+```
+hatena_id: yourid
+blog_id:   yourblog.hateblo.jp
+api_key:   *********1234
+concurrency: 5 (default)
+max_pages: unlimited
+```
+
 ## フロントマター仕様
 
 ```yaml
