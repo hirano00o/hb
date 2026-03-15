@@ -155,6 +155,8 @@ hb push --draft 20260301_my-article.md
 hb diff 20260301_my-article.md
 ```
 
+> **注意**: ローカル画像参照（`![alt](photo.jpg)` のように `http`/`https` で始まらないパス）を含む記事では、`hb push` でアップロードが完了するまで画像行に差分が表示されます。このとき stderr に `note: this file contains local images; ...` が出力されます。
+
 ### `hb new --title <title>`
 
 フロントマター付きのMarkdownファイルをカレントディレクトリに新規作成します。
@@ -253,6 +255,8 @@ hb status [--dir <directory>]
 - **Modified**: `editUrl` があり、ローカルとリモートの内容が異なる
 - **Untracked**: `editUrl` がない（未公開記事）
 - **Up to date**: ローカルとリモートが一致している
+
+> **注意**: ローカル画像参照（`![alt](photo.jpg)` のように `http`/`https` で始まらないパス）を含む記事は、`hb push` でアップロードが完了するまで **Modified** と表示される場合があります。このとき stderr に `note: <file> contains local images; ...` が出力されます。
 
 ```sh
 Modified (2):

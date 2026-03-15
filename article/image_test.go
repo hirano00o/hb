@@ -147,6 +147,34 @@ func TestReplaceLocalImages_AbsolutePathRejected(t *testing.T) {
 	}
 }
 
+func TestHasLocalImages(t *testing.T) {
+	t.Run("no images returns false", func(t *testing.T) {
+		if HasLocalImages("# Hello\n\nNo images here.\n") {
+			t.Error("expected false for body with no images")
+		}
+	})
+	t.Run("https URL returns false", func(t *testing.T) {
+		if HasLocalImages("![alt](https://example.com/image.png)\n") {
+			t.Error("expected false for https URL")
+		}
+	})
+	t.Run("http URL returns false", func(t *testing.T) {
+		if HasLocalImages("![alt](http://example.com/image.png)\n") {
+			t.Error("expected false for http URL")
+		}
+	})
+	t.Run("local relative path returns true", func(t *testing.T) {
+		if !HasLocalImages("![alt](photo.jpg)\n") {
+			t.Error("expected true for local relative path")
+		}
+	})
+	t.Run("mixed local and remote returns true", func(t *testing.T) {
+		if !HasLocalImages("![a](https://example.com/remote.png) and ![b](local.png)\n") {
+			t.Error("expected true when at least one local image present")
+		}
+	})
+}
+
 func TestReplaceLocalImages_PathTraversalRejected(t *testing.T) {
 	dir := t.TempDir()
 	uploader := func(_ context.Context, _ string) (string, error) {

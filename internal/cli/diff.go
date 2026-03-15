@@ -34,6 +34,9 @@ func newDiffCmd() *cobra.Command {
 				return err
 			}
 			remoteArticle := article.FromEntry(remote)
+			if article.HasLocalImages(local.Body) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "note: this file contains local images; image lines may appear as differences until pushed\n")
+			}
 			diff, err := unifiedDiff(path, local, remoteArticle)
 			if err != nil {
 				return err
