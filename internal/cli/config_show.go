@@ -24,7 +24,7 @@ func newConfigShowCmd() *cobra.Command {
 			if cfg.Concurrency != nil {
 				fmt.Fprintf(out, "concurrency: %d\n", *cfg.Concurrency)
 			} else {
-				fmt.Fprintf(out, "concurrency: %d (default)\n", 5)
+				fmt.Fprintf(out, "concurrency: %d (default)\n", defaultConcurrency)
 			}
 			if cfg.MaxPages != nil && *cfg.MaxPages > 0 {
 				fmt.Fprintf(out, "max_pages: %d\n", *cfg.MaxPages)
