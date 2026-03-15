@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          LDFLAGS="-s -w -X github.com/hirano00o/hb/internal/cli.version=${VERSION}"
+          CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-linux-amd64   ./cmd/hb
+          CGO_ENABLED=0 GOOS=linux   GOARCH=arm64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-linux-arm64   ./cmd/hb
+          CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-darwin-amd64  ./cmd/hb
+          CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-darwin-arm64  ./cmd/hb
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-windows-amd64.exe ./cmd/hb
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            hb-linux-amd64
+            hb-linux-arm64
+            hb-darwin-amd64
+            hb-darwin-arm64
+            hb-windows-amd64.exe
