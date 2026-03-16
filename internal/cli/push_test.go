@@ -1032,3 +1032,237 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 		t.Errorf("expected EditURL=%q after PUT, got %q", wantEditURL, updated.Frontmatter.EditURL)
 	}
 }
+
+// TestPush_NoArgs_Error verifies that push with no arguments and no --all returns an error.
+func TestPush_NoArgs_Error(t *testing.T) {
+	cmd := newPushCmd()
+	cmd.SetArgs([]string{})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for no arguments, got nil")
+	}
+	if !strings.Contains(err.Error(), "at least one file argument") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestPush_AllAndArgs_Error verifies that --all combined with file arguments returns an error.
+func TestPush_AllAndArgs_Error(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "file.md")
+	if err := os.WriteFile(p, []byte("---\ntitle: T\n---\nbody\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := newPushCmd()
+	cmd.SetArgs([]string{"--all", p})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for --all with args, got nil")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestPush_MultipleFiles_AllProcessed verifies that push with multiple file arguments
+// processes each file in turn.
+func TestPush_MultipleFiles_AllProcessed(t *testing.T) {
+	postCount := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		postCount++
+		n := postCount
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>Entry %d</title>
+  <content type="text/x-markdown">body
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/%d"/>
+  <link rel="alternate" href="https://example.com/entry/%d"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, n, r.Host, n, n)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	dir := t.TempDir()
+	var paths []string
+	for i := range 3 {
+		fm := article.Frontmatter{
+			Title: fmt.Sprintf("Entry %d", i+1),
+			Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		}
+		p := filepath.Join(dir, fmt.Sprintf("file%d.md", i+1))
+		a := &article.Article{Frontmatter: fm, Body: "body\n"}
+		if err := article.Write(p, a); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, p)
+	}
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs(append([]string{"--yes"}, paths...))
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push failed: %v\noutput: %s", err, out.String())
+	}
+
+	if postCount != 3 {
+		t.Errorf("expected 3 POST requests, got %d", postCount)
+	}
+	if strings.Count(out.String(), "Created:") != 3 {
+		t.Errorf("expected 3 'Created:' lines in output, got:\n%s", out.String())
+	}
+}
+
+// TestPush_All_ProcessesAllMD verifies that --all pushes all .md files found by globMD.
+func TestPush_All_ProcessesAllMD(t *testing.T) {
+	postCount := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		postCount++
+		n := postCount
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>Entry %d</title>
+  <content type="text/x-markdown">body
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/%d"/>
+  <link rel="alternate" href="https://example.com/entry/%d"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, n, r.Host, n, n)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	// Create temp dir and cd into it so globMD(".") picks up our files.
+	dir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	for i := range 2 {
+		fm := article.Frontmatter{
+			Title: fmt.Sprintf("Entry %d", i+1),
+			Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		}
+		p := filepath.Join(dir, fmt.Sprintf("file%d.md", i+1))
+		a := &article.Article{Frontmatter: fm, Body: "body\n"}
+		if err := article.Write(p, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--all", "--yes"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push --all failed: %v\noutput: %s", err, out.String())
+	}
+
+	if postCount != 2 {
+		t.Errorf("expected 2 POST requests, got %d", postCount)
+	}
+}
+
+// TestPush_MultipleFiles_ErrorContinues verifies that when one file fails,
+// other files are still processed and all errors are reported together.
+func TestPush_MultipleFiles_ErrorContinues(t *testing.T) {
+	postCount := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		postCount++
+		n := postCount
+		w.Header().Set("Content-Type", "application/atom+xml")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="utf-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app">
+  <title>Entry</title>
+  <content type="text/x-markdown">body
+</content>
+  <published>2026-03-01T12:00:00Z</published>
+  <updated>2026-03-01T12:00:00Z</updated>
+  <link rel="edit" href="%s/user/example.hateblo.jp/atom/entry/%d"/>
+  <link rel="alternate" href="https://example.com/entry/%d"/>
+  <app:control><app:draft>no</app:draft></app:control>
+</entry>`, r.Host, n, n)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	dir := t.TempDir()
+	fm := article.Frontmatter{Title: "Entry", Date: time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)}
+	goodPath := filepath.Join(dir, "good.md")
+	if err := article.Write(goodPath, &article.Article{Frontmatter: fm, Body: "body\n"}); err != nil {
+		t.Fatal(err)
+	}
+	nonExistent := filepath.Join(dir, "nonexistent.md")
+
+	cmd := newPushCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--yes", nonExistent, goodPath})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error due to nonexistent file, got nil")
+	}
+	// The nonexistent file must produce an error.
+	if !strings.Contains(err.Error(), "nonexistent.md") {
+		t.Errorf("expected error about nonexistent.md, got: %v", err)
+	}
+	// The good file must still have been processed.
+	if postCount != 1 {
+		t.Errorf("expected 1 POST for good.md, got %d", postCount)
+	}
+}
