@@ -120,8 +120,10 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 			filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
 			path := filepath.Join(dir, filename)
 
-			// resolveConflict and the subsequent output are serialised together
-			// to prevent interleaved prompts and concurrent writes to cmd.Out.
+			// Hold the lock across resolveConflict AND article.Write so that
+			// two goroutines resolving to the same destination path cannot
+			// both pass the conflict check before either has written the file
+			// (TOCTOU race).
 			interactMu.Lock()
 			destPath, skip, err := resolveConflict(cmd, path, force)
 			if err != nil {
@@ -133,12 +135,10 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 				interactMu.Unlock()
 				return nil
 			}
-			interactMu.Unlock()
-
 			if err := article.Write(destPath, a); err != nil {
+				interactMu.Unlock()
 				return err
 			}
-			interactMu.Lock()
 			fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
 			interactMu.Unlock()
 			saved.Add(1)
