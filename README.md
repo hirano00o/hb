@@ -2,6 +2,16 @@
 
 はてなブログの記事をローカルのMarkdownファイルとして管理し、AtomPub APIで同期するCLIツールです。
 
+## 目次
+- [インストール](#インストール)
+- [初期設定](#初期設定)
+- [設定](#設定)
+- [グローバルフラグ](#グローバルフラグ)
+- [コマンドリファレンス](#コマンドリファレンス)
+- [フロントマター仕様](#フロントマター仕様)
+- [ファイル名規則](#ファイル名規則)
+- [開発](#開発)
+
 ## インストール
 
 ```sh
@@ -37,12 +47,6 @@ hb config init -g
 対話形式で Hatena ID・Blog ID・API キーを入力します。API キー入力時はターミナル上でマスキングされます。
 設定は `~/.config/hb/config.yaml` に保存されます。
 
-フラグで Hatena ID と Blog ID を指定することもできます（API キーは必ずマスキングされた対話入力):
-
-```sh
-hb config init -g --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
-```
-
 ### プロジェクト設定（任意）
 
 グローバル設定の値をプロジェクトごとに上書きしたい場合は、プロジェクトルートで実行します:
@@ -52,11 +56,9 @@ hb config init
 ```
 
 対話形式で各フィールドを入力します。空 Enter でスキップしたフィールドはファイルに書き込まれず、グローバル設定が使われます。
-設定は `.hb/config.yaml` に保存されます。フラグでも指定できます:
+設定は `.hb/config.yaml` に保存されます。
 
-```sh
-hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
-```
+## 設定
 
 ### 環境変数による設定オーバーライド
 
@@ -70,9 +72,42 @@ hb config init --hatena-id YOUR_ID --blog-id YOUR_BLOG.hateblo.jp
 | `HB_CONCURRENCY` | pull の並列実行数（デフォルト: 5） |
 | `HB_MAX_PAGES` | pull のページ取得上限（デフォルト: 0 = 無制限） |
 
+### 設定ファイルの優先度
+
+環境変数 > プロジェクト設定（`.hb/config.yaml`）> グローバル設定（`~/.config/hb/config.yaml`）
+
+### 設定ファイルの例
+
+```yaml
+hatena_id: yourhatenaId
+blog_id: yourblog.hateblo.jp
+api_key: your_api_key
+concurrency: 10  # pull の並列実行数（デフォルト: 5）
+max_pages: 5     # pull のページ取得上限（デフォルト: 0 = 無制限）
+```
+
+### `hb config init`
+
+プロジェクトローカル設定を対話形式で初期化します。空 Enter でスキップしたフィールドはファイルに書き込まれません。
+
+`-g` フラグでグローバル設定を初期化します（全フィールドの入力が必須）。
+
+### `hb config show`
+
+現在の有効な設定値を表示します（グローバル設定 → プロジェクト設定 → 環境変数の優先順でマージ済みの値）。
+
 ```sh
-export HB_API_KEY=your_api_key
-hb push article.md
+hb config show
+```
+
+API キーは末尾4文字のみ表示され、残りは `*` でマスクされます。未設定のフィールドはデフォルト値とともに表示されます。
+
+```
+hatena_id: yourid
+blog_id:   yourblog.hateblo.jp
+api_key:   *********1234
+concurrency: 5 (default)
+max_pages: unlimited
 ```
 
 ## グローバルフラグ
@@ -99,10 +134,7 @@ hb pull [--force|-f] [--dir <directory>] [--from <date>] [--to <date>]
 - `--from`: 指定日以降に投稿された記事のみ取得（形式: `YYYY-mm-dd`, `YYYY/mm/dd`, `YYYYmmdd`）
 - `--to`: 指定日以前に投稿された記事のみ取得（形式: `YYYY-mm-dd`, `YYYY/mm/dd`, `YYYYmmdd`）
 
-ファイル名が既存ファイルと衝突した場合（`--force` なし）:
-1. **カスタム名**を入力 → そのファイル名で保存
-2. **Enter（空入力）** → 連番suffix（`_1`, `_2`, …）を自動付与してリネーム
-3. **`s`** → この記事のダウンロードをスキップ
+ファイル名衝突時（`--force` なし）は、カスタム名入力 / Enter（連番suffix自動付与）/ `s`（スキップ）から選択します。
 
 既に `editUrl` が一致するローカルファイルがある記事は自動的にスキップされます。
 
@@ -137,14 +169,7 @@ hb push [--yes|-y] [--draft] <file>
 - `--draft`: 下書きとして投稿。frontmatter の `draft` 値と異なる場合は確認プロンプトを表示
 
 ```sh
-# 差分を確認しながらpush
 hb push 20260301_my-article.md
-
-# 確認なしでpush
-hb push --yes 20260301_my-article.md
-
-# 下書きとして強制push（確認あり）
-hb push --draft 20260301_my-article.md
 ```
 
 ### `hb diff <file>`
@@ -177,16 +202,6 @@ hb new --title|-t <title> [--draft] [--push|-p] [--body|-b <body>]
 hb new -t "はじめての記事"
 # → 20260306_はじめての記事.md を作成
 
-# 下書きとして作成
-hb new --draft -t "下書き記事"
-# → draft_20260306_下書き記事.md を作成
-
-# 本文をフラグで指定（\n は改行に変換）
-hb new -t "はじめての記事" -b '# はじめに\n\n本文です。'
-
-# パイプで本文を渡す（\n は変換しない）
-cat body.md | hb new -t "はじめての記事"
-
 # 作成と同時にリモートへ投稿
 hb new --push -t "公開記事"
 ```
@@ -205,18 +220,7 @@ hb list [--dir <directory>] [--draft] [--published]
 
 `--draft` と `--published` は同時に指定できません。
 
-`.` 始まりのディレクトリ（`.git`、`.hb` 等）は走査対象から除外されます。フロントマターのないファイルはサイレントにスキップされます。読み取りに失敗したファイルはデフォルトで件数サマリーを stderr に表示してスキップします。グローバルフラグ `--verbose` を付けると、スキップされたファイルを1件ずつ詳細表示します。
-
-```sh
-# カレントディレクトリの全記事を表示
-hb list
-
-# 下書きのみ表示
-hb list --draft
-
-# 特定ディレクトリの公開記事のみ表示
-hb list --dir ./posts --published
-```
+`.` 始まりのディレクトリ（`.git`、`.hb` 等）は走査対象から除外されます。フロントマターのないファイルはサイレントにスキップされます。読み取りに失敗したファイルはデフォルトで件数サマリーを stderr に表示し、`--verbose` で詳細表示できます。
 
 ### `hb open <file>`
 
@@ -229,11 +233,7 @@ hb open [--edit|-e] <file>
 - `--edit` / `-e`: はてなブログの編集ページ（`https://blog.hatena.ne.jp/{user}/{blog}/edit?entry={id}`）を開く
 
 ```sh
-# 公開URLを開く
 hb open 20260301_my-article.md
-
-# はてなブログの編集ページを開く
-hb open --edit 20260301_my-article.md
 ```
 
 frontmatter に `url`（または `--edit` 時は `editUrl`）が設定されていない（未公開の）記事ではエラーになります。
@@ -258,10 +258,10 @@ hb status [--dir <directory>]
 
 > **注意**: ローカル画像参照（`![alt](photo.jpg)` のように `http`/`https` で始まらないパス）を含む記事は、`hb push` でアップロードが完了するまで **Modified** と表示される場合があります。このとき stderr に `note: <file> contains local images; ...` が出力されます。
 
-```sh
+```
 Modified (2):
   20260301_Article1.md
-  20260302_Article2.md
+  ...
 
 Untracked (1):
   draft_NewPost.md
@@ -269,30 +269,6 @@ Untracked (1):
 Up to date (3):
   20260201_OldPost.md
   ...
-```
-
-### `hb config init`
-
-プロジェクトローカル設定を対話形式で初期化します。空 Enter でスキップしたフィールドはファイルに書き込まれません。
-
-`-g` フラグでグローバル設定を初期化します（全フィールドの入力が必須）。
-
-### `hb config show`
-
-現在の有効な設定値を表示します（グローバル設定 → プロジェクト設定 → 環境変数の優先順でマージ済みの値）。
-
-```sh
-hb config show
-```
-
-API キーは末尾4文字のみ表示され、残りは `*` でマスクされます。未設定のフィールドはデフォルト値とともに表示されます。
-
-```
-hatena_id: yourid
-blog_id:   yourblog.hateblo.jp
-api_key:   *********1234
-concurrency: 5 (default)
-max_pages: unlimited
 ```
 
 ## フロントマター仕様
@@ -330,20 +306,6 @@ scheduledAt: 2026-04-01T12:00:00+09:00
 ```
 
 例: `20260301_My Article Title.md` / `draft_20260301_未公開記事.md`
-
-## 設定ファイルの優先度
-
-環境変数 > プロジェクト設定（`.hb/config.yaml`）> グローバル設定（`~/.config/hb/config.yaml`）
-
-### 設定ファイルの例
-
-```yaml
-hatena_id: yourhatenaId
-blog_id: yourblog.hateblo.jp
-api_key: your_api_key
-concurrency: 10  # pull の並列実行数（デフォルト: 5）
-max_pages: 5     # pull のページ取得上限（デフォルト: 0 = 無制限）
-```
 
 ## 開発
 
