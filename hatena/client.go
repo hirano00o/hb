@@ -86,7 +86,7 @@ func readBody(resp *http.Response) ([]byte, error) {
 
 func checkStatus(resp *http.Response, data []byte) error {
 	switch resp.StatusCode {
-	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent: // NoContent is used by DeleteEntry
 		return nil
 	case http.StatusUnauthorized:
 		return fmt.Errorf("authentication failed (401)")
@@ -177,12 +177,12 @@ func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*En
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp, data); err != nil {
-		return nil, err
-	}
 	if resp.StatusCode == http.StatusNoContent {
 		// Server accepted the update but returned no body; use the sent entry.
 		return e, nil
+	}
+	if err := checkStatus(resp, data); err != nil {
+		return nil, err
 	}
 	return parseEntry(data)
 }
