@@ -17,6 +17,9 @@ import (
 // TestDiff_NoEditURL_NewEntry verifies that diff prints a message for unpublished entries
 // and exits without error.
 func TestDiff_NoEditURL_NewEntry(t *testing.T) {
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
 	fm := article.Frontmatter{
 		Title: "Unpublished",
 		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),

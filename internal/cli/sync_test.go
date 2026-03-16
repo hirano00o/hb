@@ -16,6 +16,9 @@ import (
 
 // TestSync_NoEditURL verifies that sync returns an error when the file has no editUrl.
 func TestSync_NoEditURL(t *testing.T) {
+	t.Setenv("HB_HATENA_ID", "user")
+	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
+	t.Setenv("HB_API_KEY", "key")
 	fm := article.Frontmatter{
 		Title: "No EditURL",
 		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
