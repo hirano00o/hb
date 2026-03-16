@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 )
@@ -21,8 +22,13 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg, _ := config.LoadMerged() // errors already caught by newClientFromConfig
+			maxPages := 0
+			if cfg != nil && cfg.MaxPages != nil {
+				maxPages = *cfg.MaxPages
+			}
 			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
-			return runStatus(cmd, client, dir, v)
+			return runStatus(cmd, client, dir, maxPages, v)
 		},
 	}
 
@@ -30,7 +36,7 @@ func newStatusCmd() *cobra.Command {
 	return cmd
 }
 
-func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnings bool) error {
+func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, maxPages int, showWarnings bool) error {
 	files, err := globMD(dir)
 	if err != nil {
 		return err
@@ -78,7 +84,7 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, showWarnin
 	}
 
 	// Fetch remote entries and build editURL → *Article map.
-	remoteEntries, err := client.ListEntries(cmd.Context(), 0)
+	remoteEntries, err := client.ListEntries(cmd.Context(), maxPages)
 	if err != nil {
 		return err
 	}
