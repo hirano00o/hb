@@ -113,17 +113,32 @@ func TestRunSearch(t *testing.T) {
 		}
 	})
 
-	t.Run("title and body flags conflict", func(t *testing.T) {
+	t.Run("title and body flags AND search", func(t *testing.T) {
+		dir := t.TempDir()
+		// a: keyword in both title and body — should match
+		writeMD(t, dir, "a.md", "---\ntitle: keyword title\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\nkeyword in body\n")
+		// b: keyword in title only — should not match
+		writeMD(t, dir, "b.md", "---\ntitle: keyword title\ndate: 2026-02-01T00:00:00Z\ndraft: false\n---\nno match here\n")
+		// c: keyword in body only — should not match
+		writeMD(t, dir, "c.md", "---\ntitle: unrelated title\ndate: 2026-03-01T00:00:00Z\ndraft: false\n---\nkeyword in body\n")
+
 		cmd := &cobra.Command{}
-		cmd.SetOut(&bytes.Buffer{})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runSearch(cmd, "query", t.TempDir(), true, true, false)
-		if err == nil {
-			t.Fatal("expected error for --title + --body, got nil")
+		if err := runSearch(cmd, "keyword", dir, true, true, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if !strings.Contains(err.Error(), "cannot be used together") {
-			t.Errorf("unexpected error message: %v", err)
+		out := buf.String()
+		if !strings.Contains(out, "keyword title") || !strings.Contains(out, "2026-01-01") {
+			t.Errorf("expected article with keyword in both title and body, got %q", out)
+		}
+		if strings.Contains(out, "2026-02-01") {
+			t.Errorf("expected title-only match to be excluded, got %q", out)
+		}
+		if strings.Contains(out, "unrelated title") {
+			t.Errorf("expected body-only match to be excluded, got %q", out)
 		}
 	})
 

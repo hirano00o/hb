@@ -31,18 +31,12 @@ func newSearchCmd() *cobra.Command {
 }
 
 func runSearch(cmd *cobra.Command, query, dir string, titleOnly, bodyOnly bool, showWarnings bool) error {
-	if titleOnly && bodyOnly {
-		return fmt.Errorf("--title and --body cannot be used together")
-	}
-
 	files, err := globMD(dir)
 	if err != nil {
 		return err
 	}
 
 	q := strings.ToLower(query)
-	searchTitle := !bodyOnly
-	searchBody := !titleOnly
 
 	var matched []*article.Article
 	var readErrCount int
@@ -61,11 +55,20 @@ func runSearch(cmd *cobra.Command, query, dir string, titleOnly, bodyOnly bool, 
 			}
 			continue
 		}
-		if searchTitle && strings.Contains(strings.ToLower(a.Frontmatter.Title), q) {
-			matched = append(matched, a)
-			continue
+		inTitle := strings.Contains(strings.ToLower(a.Frontmatter.Title), q)
+		inBody := strings.Contains(strings.ToLower(a.Body), q)
+		var hit bool
+		switch {
+		case titleOnly && bodyOnly:
+			hit = inTitle && inBody
+		case titleOnly:
+			hit = inTitle
+		case bodyOnly:
+			hit = inBody
+		default:
+			hit = inTitle || inBody
 		}
-		if searchBody && strings.Contains(strings.ToLower(a.Body), q) {
+		if hit {
 			matched = append(matched, a)
 		}
 	}
