@@ -120,27 +120,31 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 			filename := article.GenerateFilename(e.Title, e.Date, e.Draft)
 			path := filepath.Join(dir, filename)
 
-			// resolveConflict and the subsequent output are serialised together
-			// to prevent interleaved prompts and concurrent writes to cmd.Out.
+			// Hold the lock across resolveConflict AND article.Write so that
+			// two goroutines resolving to the same destination path cannot
+			// both pass the conflict check before either has written the file
+			// (TOCTOU race). Output is also emitted inside the lock to prevent
+			// concurrent writes to cmd.OutOrStdout().
+			// Note: when --force is not set, resolveConflict may block on a
+			// user prompt, which serialises all goroutines for the duration.
+			// This is intentional: interactive conflict resolution is inherently
+			// serial, and the lock scope cannot be reduced without reintroducing
+			// the TOCTOU race.
 			interactMu.Lock()
+			defer interactMu.Unlock()
+
 			destPath, skip, err := resolveConflict(cmd, path, force)
 			if err != nil {
-				interactMu.Unlock()
 				return err
 			}
 			if skip {
 				fmt.Fprintf(cmd.OutOrStdout(), "skipped: %s\n", path)
-				interactMu.Unlock()
 				return nil
 			}
-			interactMu.Unlock()
-
 			if err := article.Write(destPath, a); err != nil {
 				return err
 			}
-			interactMu.Lock()
 			fmt.Fprintf(cmd.OutOrStdout(), "saved: %s\n", destPath)
-			interactMu.Unlock()
 			saved.Add(1)
 			return nil
 		})
@@ -193,7 +197,8 @@ func resolveConflict(cmd *cobra.Command, path string, force bool) (dest string, 
 	}
 
 	if force {
-		return autoRename(path), false, nil
+		dest, err := autoRename(path)
+		return dest, false, err
 	}
 
 	// Interactive: ask to rename or skip.
@@ -206,7 +211,8 @@ func resolveConflict(cmd *cobra.Command, path string, force bool) (dest string, 
 			return "", false, err
 		}
 		// EOF → auto-rename
-		return autoRename(path), false, nil
+		dest, err := autoRename(path)
+		return dest, false, err
 	}
 	input := strings.TrimSpace(scanner.Text())
 
@@ -214,7 +220,8 @@ func resolveConflict(cmd *cobra.Command, path string, force bool) (dest string, 
 		return "", true, nil
 	}
 	if input == "" {
-		return autoRename(path), false, nil
+		dest, err := autoRename(path)
+		return dest, false, err
 	}
 	// Use only the base name to prevent path traversal (e.g. "../../etc/passwd").
 	return filepath.Join(filepath.Dir(path), filepath.Base(input)), false, nil
@@ -223,14 +230,19 @@ func resolveConflict(cmd *cobra.Command, path string, force bool) (dest string, 
 // autoRename generates a path that does not yet exist by appending an incrementing
 // counter suffix to the base name.
 // e.g. "20260301_Title.md" → "20260301_Title_1.md", "_2.md", …
-func autoRename(path string) string {
+// Returns an error if os.Stat fails for any reason other than the file not existing.
+func autoRename(path string) (string, error) {
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(filepath.Base(path), ext)
 	dir := filepath.Dir(path)
 	for i := 1; ; i++ {
 		candidate := filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
-		if _, err := os.Stat(candidate); os.IsNotExist(err) {
-			return candidate
+		_, err := os.Stat(candidate)
+		if os.IsNotExist(err) {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("stat %s: %w", candidate, err)
 		}
 	}
 }

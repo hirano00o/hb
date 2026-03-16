@@ -193,6 +193,68 @@ func TestUpdateEntry_OK(t *testing.T) {
 	}
 }
 
+func TestUpdateEntry_NoContent(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/123", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	c := newTestClient(t, mux)
+	e := &Entry{Title: "Updated", Content: "body"}
+	got, err := c.UpdateEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/123", e)
+	if err != nil {
+		t.Fatalf("expected no error for 204 No Content, got %v", err)
+	}
+	if got != e {
+		t.Errorf("expected sent entry to be returned on 204, got %v", got)
+	}
+}
+
+func TestDeleteEntry_NoContent(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/123", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	c := newTestClient(t, mux)
+	err := c.DeleteEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/123")
+	if err != nil {
+		t.Fatalf("expected no error for 204 No Content, got %v", err)
+	}
+}
+
+func TestUpdateEntry_NotFound(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/999", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	c := newTestClient(t, mux)
+	e := &Entry{Title: "Ghost", Content: "body"}
+	_, err := c.UpdateEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/999", e)
+	if err == nil || !strings.Contains(err.Error(), "404") {
+		t.Errorf("expected 404 error, got %v", err)
+	}
+}
+
+func TestUpdateEntry_Unauthorized(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/1", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	c := newTestClient(t, mux)
+	e := &Entry{Title: "Locked", Content: "body"}
+	_, err := c.UpdateEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/1", e)
+	if err == nil || !strings.Contains(err.Error(), "401") {
+		t.Errorf("expected 401 error, got %v", err)
+	}
+}
+
 func TestGetEntry_ContextCancel(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/1", func(w http.ResponseWriter, r *http.Request) {
