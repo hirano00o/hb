@@ -45,6 +45,19 @@ func TestCompletion_Fish(t *testing.T) {
 	}
 }
 
+func TestCompletion_Powershell(t *testing.T) {
+	root := NewRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetArgs([]string{"completion", "powershell"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected powershell completion output, got empty")
+	}
+}
+
 func TestCompletion_InvalidShell(t *testing.T) {
 	root := NewRootCmd()
 	var errBuf bytes.Buffer
@@ -56,5 +69,16 @@ func TestCompletion_InvalidShell(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid argument") {
 		t.Errorf("expected 'invalid argument' in error, got: %v", err)
+	}
+}
+
+func TestCompletion_NoArgs(t *testing.T) {
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"completion"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for no arguments, got nil")
 	}
 }
