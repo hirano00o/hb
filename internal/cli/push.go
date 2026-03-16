@@ -75,7 +75,7 @@ func newPushCmd() *cobra.Command {
 func pushOne(ctx context.Context, cmd *cobra.Command, client *hatena.Client, path string, yes, draft, draftSet bool) error {
 	local, err := article.Read(path)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", path, err)
+		return fmt.Errorf("read: %w", err)
 	}
 
 	// Apply --draft override when the flag was explicitly set.
