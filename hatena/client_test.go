@@ -229,7 +229,6 @@ func TestDeleteEntry_NoContent(t *testing.T) {
 	}
 }
 
-
 func TestUpdateEntry_NotFound(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/999", func(w http.ResponseWriter, r *http.Request) {

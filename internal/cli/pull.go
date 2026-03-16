@@ -125,6 +125,11 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 			// both pass the conflict check before either has written the file
 			// (TOCTOU race). Output is also emitted inside the lock to prevent
 			// concurrent writes to cmd.OutOrStdout().
+			// Note: when --force is not set, resolveConflict may block on a
+			// user prompt, which serialises all goroutines for the duration.
+			// This is intentional: interactive conflict resolution is inherently
+			// serial, and the lock scope cannot be reduced without reintroducing
+			// the TOCTOU race.
 			interactMu.Lock()
 			defer interactMu.Unlock()
 
