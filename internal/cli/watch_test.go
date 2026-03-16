@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,6 +102,69 @@ func TestWatch_FileChange_TriggersPush(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("timed out waiting for push after file change")
+	}
+
+	cancel()
+	<-done
+}
+
+// TestWatch_Debounce verifies that rapid successive saves result in only one push.
+func TestWatch_Debounce(t *testing.T) {
+	dir := t.TempDir()
+	fm := article.Frontmatter{
+		Title: "Debounce Test",
+		Date:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		Draft: true,
+	}
+	a := &article.Article{Frontmatter: fm, Body: "v0\n"}
+	path := filepath.Join(dir, "debounce_test.md")
+	if err := article.Write(path, a); err != nil {
+		t.Fatal(err)
+	}
+
+	pushCount := 0
+	origPushFileFunc := pushFileFunc
+	t.Cleanup(func() { pushFileFunc = origPushFileFunc })
+	pushed := make(chan struct{}, 10)
+	pushFileFunc = func(_ *cobra.Command, _ string) error {
+		pushCount++
+		pushed <- struct{}{}
+		return nil
+	}
+
+	debounce := 150 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd := newWatchCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- runWatch(ctx, cmd, []string{path}, debounce)
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	// Write the file 5 times within the debounce window.
+	for i := 1; i <= 5; i++ {
+		if err := os.WriteFile(path, []byte(fmt.Sprintf("v%d\n", i)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// Wait for exactly one push (debounce should coalesce all writes).
+	select {
+	case <-pushed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for push")
+	}
+
+	// Wait a bit to ensure no second push arrives.
+	time.Sleep(200 * time.Millisecond)
+	if pushCount != 1 {
+		t.Errorf("expected 1 push, got %d", pushCount)
 	}
 
 	cancel()

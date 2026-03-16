@@ -40,7 +40,7 @@ Examples:
 			// Resolve the set of files to watch.
 			var paths []string
 			switch {
-			case len(args) == 1 && dir != ".":
+			case len(args) == 1 && cmd.Flags().Changed("dir"):
 				return fmt.Errorf("--dir and a file argument are mutually exclusive")
 			case len(args) == 1:
 				paths = args
@@ -95,12 +95,21 @@ func runWatch(ctx context.Context, cmd *cobra.Command, paths []string, debounce 
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Watching %d file(s). Press Ctrl+C to stop.\n", len(fileSet))
 
+	// Propagate the context so pushFile can pass it to subcommands.
+	cmd.SetContext(ctx)
+
 	// Debounce timers keyed by file path.
 	timers := make(map[string]*time.Timer)
+	stopAllTimers := func() {
+		for _, t := range timers {
+			t.Stop()
+		}
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
+			stopAllTimers()
 			fmt.Fprintln(cmd.OutOrStdout(), "\nStopped.")
 			return nil
 
@@ -129,6 +138,9 @@ func runWatch(ctx context.Context, cmd *cobra.Command, paths []string, debounce 
 				t.Stop()
 			}
 			timers[abs] = time.AfterFunc(debounce, func() {
+				if ctx.Err() != nil {
+					return
+				}
 				if err := pushFileFunc(cmd, abs); err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "push %s: %v\n", abs, err)
 				}
