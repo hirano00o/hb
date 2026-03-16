@@ -113,6 +113,20 @@ func TestRunSearch(t *testing.T) {
 		}
 	})
 
+	t.Run("title and body flags conflict", func(t *testing.T) {
+		cmd := &cobra.Command{}
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		err := runSearch(cmd, "query", t.TempDir(), true, true, false)
+		if err == nil {
+			t.Fatal("expected error for --title + --body, got nil")
+		}
+		if !strings.Contains(err.Error(), "cannot be used together") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
 	t.Run("no matches returns no articles found", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMD(t, dir, "a.md", "---\ntitle: Unrelated\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\nunrelated body\n")

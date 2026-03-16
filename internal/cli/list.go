@@ -112,7 +112,7 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, show
 		if filterCategory != "" {
 			found := false
 			for _, cat := range a.Frontmatter.Category {
-				if cat == filterCategory {
+				if strings.EqualFold(cat, filterCategory) {
 					found = true
 					break
 				}

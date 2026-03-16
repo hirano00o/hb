@@ -31,6 +31,10 @@ func newSearchCmd() *cobra.Command {
 }
 
 func runSearch(cmd *cobra.Command, query, dir string, titleOnly, bodyOnly bool, showWarnings bool) error {
+	if titleOnly && bodyOnly {
+		return fmt.Errorf("--title and --body cannot be used together")
+	}
+
 	files, err := globMD(dir)
 	if err != nil {
 		return err
