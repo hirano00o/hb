@@ -180,6 +180,10 @@ func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*En
 	if err := checkStatus(resp, data); err != nil {
 		return nil, err
 	}
+	if resp.StatusCode == http.StatusNoContent {
+		// Server accepted the update but returned no body; use the sent entry.
+		return e, nil
+	}
 	return parseEntry(data)
 }
 

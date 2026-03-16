@@ -22,9 +22,12 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cfg, _ := config.LoadMerged() // errors already caught by newClientFromConfig
+			cfg, err := config.LoadMerged()
+			if err != nil {
+				return err
+			}
 			maxPages := 0
-			if cfg != nil && cfg.MaxPages != nil {
+			if cfg.MaxPages != nil {
 				maxPages = *cfg.MaxPages
 			}
 			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")

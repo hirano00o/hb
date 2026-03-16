@@ -193,6 +193,26 @@ func TestUpdateEntry_OK(t *testing.T) {
 	}
 }
 
+func TestUpdateEntry_NoContent(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/123", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	c := newTestClient(t, mux)
+	e := &Entry{Title: "Updated", Content: "body"}
+	got, err := c.UpdateEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/123", e)
+	if err != nil {
+		t.Fatalf("expected no error for 204 No Content, got %v", err)
+	}
+	if got != e {
+		t.Errorf("expected sent entry to be returned on 204, got %v", got)
+	}
+}
+
 func TestDeleteEntry_NoContent(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/123", func(w http.ResponseWriter, r *http.Request) {

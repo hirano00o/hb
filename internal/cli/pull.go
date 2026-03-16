@@ -123,7 +123,8 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 			// Hold the lock across resolveConflict AND article.Write so that
 			// two goroutines resolving to the same destination path cannot
 			// both pass the conflict check before either has written the file
-			// (TOCTOU race).
+			// (TOCTOU race). Output is also emitted inside the lock to prevent
+			// concurrent writes to cmd.OutOrStdout().
 			interactMu.Lock()
 			destPath, skip, err := resolveConflict(cmd, path, force)
 			if err != nil {
