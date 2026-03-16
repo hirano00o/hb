@@ -86,7 +86,7 @@ func readBody(resp *http.Response) ([]byte, error) {
 
 func checkStatus(resp *http.Response, data []byte) error {
 	switch resp.StatusCode {
-	case http.StatusOK, http.StatusCreated:
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
 		return nil
 	case http.StatusUnauthorized:
 		return fmt.Errorf("authentication failed (401)")
