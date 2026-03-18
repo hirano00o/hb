@@ -34,9 +34,15 @@ func newListCmd() *cobra.Command {
 }
 
 func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, showWarnings bool, filterCategory string, listCategories bool) error {
+	// --categories is a summary mode: it aggregates article counts per category across all
+	// articles and returns early before any article-level filter is applied (see below).
+	// Allowing --draft/--published/--category together would silently ignore those filters,
+	// producing counts that do not match what the user asked for.
 	if listCategories && (draftOnly || publishedOnly || filterCategory != "") {
 		return fmt.Errorf("--categories cannot be used with --draft, --published, or --category")
 	}
+	// The draft field is a boolean, so --draft (draft=true) and --published (draft=false)
+	// are mutually exclusive states. No article can satisfy both at once.
 	if draftOnly && publishedOnly {
 		return fmt.Errorf("--draft and --published cannot be used together")
 	}
