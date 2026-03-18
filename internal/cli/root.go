@@ -38,6 +38,8 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newPublishCmd())
 	root.AddCommand(newUnpublishCmd())
 	root.AddCommand(newRenameCmd())
+	root.AddCommand(newScheduleCmd())
+	root.AddCommand(newUnscheduleCmd())
 
 	return root
 }
