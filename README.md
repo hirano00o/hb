@@ -211,16 +211,32 @@ hb new --push -t "公開記事"
 ローカルの記事一覧をテーブル形式で表示します。日付の降順（新しい記事が上）でソートされます。
 
 ```sh
-hb list [--dir <directory>] [--draft] [--published]
+hb list [--dir <directory>] [--draft] [--published] [--category <name>] [--categories]
 ```
 
 - `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
 - `--draft`: 下書きのみ表示
 - `--published`: 公開記事のみ表示
+- `--category <name>`: 指定カテゴリの記事のみ表示
+- `--categories`: 全カテゴリを一覧表示
 
-`--draft` と `--published` は同時に指定できません。
+`--draft` と `--published` は同時に指定できません。`--categories` は `--draft`、`--published`、`--category` と同時に指定できません。
 
 `.` 始まりのディレクトリ（`.git`、`.hb` 等）は走査対象から除外されます。フロントマターのないファイルはサイレントにスキップされます。読み取りに失敗したファイルはデフォルトで件数サマリーを stderr に表示し、`--verbose` で詳細表示できます。
+
+### `hb search`
+
+ローカルの記事をキーワード検索します。大文字小文字を区別しません。
+
+```sh
+hb search <query> [--dir <directory>] [--title] [--body]
+```
+
+- `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
+- `--title`: タイトルのみ検索
+- `--body`: 本文のみ検索
+
+フラグなしの場合はタイトルと本文のOR検索を行います。`--title` と `--body` を両方指定するとAND検索（タイトルと本文の両方に一致）になります。
 
 ### `hb open <file>`
 
