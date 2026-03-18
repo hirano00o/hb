@@ -203,6 +203,25 @@ hb rename <file> --title <title> [--force]
 - `--title`: 新しい記事タイトル（必須）
 - `--force`: リネーム先ファイルが既に存在する場合でも上書き
 
+### `hb schedule`
+
+記事の予約投稿日時を設定します。
+
+```sh
+hb schedule <file> <datetime>
+```
+
+- `<datetime>`: 予約投稿日時。RFC3339形式（`2026-04-01T12:00:00+09:00`）または `YYYY-MM-DD HH:MM:SS` 形式で指定
+
+### `hb unschedule`
+
+記事の予約投稿日時をクリアします。
+
+```sh
+hb unschedule <file>
+```
+
+
 ### `hb diff <file>`
 
 ローカルファイルとリモートのunified diffを表示します。
@@ -242,7 +261,7 @@ hb new --push -t "公開記事"
 ローカルの記事一覧をテーブル形式で表示します。日付の降順（新しい記事が上）でソートされます。
 
 ```sh
-hb list [--dir <directory>] [--draft] [--published] [--category <name>] [--categories]
+hb list [--dir <directory>] [--draft] [--published] [--scheduled] [--category <name>] [--categories]
 ```
 
 - `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
@@ -250,8 +269,9 @@ hb list [--dir <directory>] [--draft] [--published] [--category <name>] [--categ
 - `--published`: 公開記事のみ表示
 - `--category <name>`: 指定カテゴリの記事のみ表示
 - `--categories`: 全カテゴリを一覧表示
+- `--scheduled`: 予約投稿記事のみ表示
 
-`--draft` と `--published` は同時に指定できません。`--categories` は `--draft`、`--published`、`--category` と同時に指定できません。
+`--draft` と `--published` は同時に指定できません。`--scheduled` は `--draft`、`--published` と同時に指定できません。`--categories` は `--draft`、`--published`、`--category`、`--scheduled` と同時に指定できません。
 
 `.` 始まりのディレクトリ（`.git`、`.hb` 等）は走査対象から除外されます。フロントマターのないファイルはサイレントにスキップされます。読み取りに失敗したファイルはデフォルトで件数サマリーを stderr に表示し、`--verbose` で詳細表示できます。
 
