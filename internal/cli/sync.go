@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -12,61 +13,93 @@ import (
 
 func newSyncCmd() *cobra.Command {
 	var yes bool
+	var all bool
 
 	cmd := &cobra.Command{
-		Use:   "sync <file>",
+		Use:   "sync [<file> ...]",
 		Short: "Sync the remote version of an entry to the local file",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MinimumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			path := args[0]
-			local, err := article.Read(path)
-			if err != nil {
-				return fmt.Errorf("read %s: %w", path, err)
+
+			if all && len(args) > 0 {
+				return fmt.Errorf("--all and file arguments are mutually exclusive")
 			}
-			if local.Frontmatter.EditURL == "" {
-				return fmt.Errorf("%s: editUrl is missing from frontmatter", path)
+			if !all && len(args) == 0 {
+				return fmt.Errorf("at least one file argument is required, or use --all")
+			}
+
+			paths := args
+			if all {
+				var err error
+				paths, err = globMD(".")
+				if err != nil {
+					return fmt.Errorf("glob: %w", err)
+				}
 			}
 
 			client, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
-			remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
-			if err != nil {
-				return err
-			}
 
-			remoteArticle := article.FromEntry(remote)
-			diff, err := unifiedDiff(path, local, remoteArticle)
-			if err != nil {
-				return err
-			}
-			if diff == "" {
-				fmt.Fprintln(cmd.OutOrStdout(), "No changes.")
-				return nil
-			}
-			fmt.Fprint(cmd.OutOrStdout(), diff)
-
-			if !yes {
-				ok, err := confirmAction(cmd, "Overwrite local file? [y/N]: ")
+			var errs []error
+			for _, path := range paths {
+				local, err := article.Read(path)
 				if err != nil {
-					return err
+					errs = append(errs, fmt.Errorf("%s: read: %w", path, err))
+					continue
 				}
-				if !ok {
-					fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-					return nil
+				if local.Frontmatter.EditURL == "" {
+					// --all: skip entries without editUrl and collect as error
+					errs = append(errs, fmt.Errorf("%s: editUrl is missing from frontmatter", path))
+					continue
 				}
+
+				remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", path, err))
+					continue
+				}
+
+				remoteArticle := article.FromEntry(remote)
+				diff, err := unifiedDiff(path, local, remoteArticle)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", path, err))
+					continue
+				}
+				if diff == "" {
+					fmt.Fprintln(cmd.OutOrStdout(), "No changes.")
+					continue
+				}
+				fmt.Fprint(cmd.OutOrStdout(), diff)
+
+				if !yes {
+					ok, err := confirmAction(cmd, "Overwrite local file? [y/N]: ")
+					if err != nil {
+						errs = append(errs, fmt.Errorf("%s: %w", path, err))
+						continue
+					}
+					if !ok {
+						fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+						continue
+					}
+				}
+				if err := article.Write(path, remoteArticle); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", path, err))
+					continue
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Updated: %s\n", path)
 			}
-			if err := article.Write(path, remoteArticle); err != nil {
-				return err
+			if len(errs) > 0 {
+				return errors.Join(errs...)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Updated: %s\n", path)
 			return nil
 		},
 	}
 
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&all, "all", false, "Sync all .md files under the current directory")
 	return cmd
 }
 
