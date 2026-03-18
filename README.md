@@ -172,6 +172,37 @@ hb push [--yes|-y] [--draft] <file>
 hb push 20260301_my-article.md
 ```
 
+### `hb publish`
+
+指定した記事を公開状態にします。`draft` を `false` に設定し、ファイル名の `draft_` プレフィックスを除去します。
+
+```sh
+hb publish <file> [--push|-p]
+```
+
+- `--push` / `-p`: 変更後にリモートへ即座に反映
+
+### `hb unpublish`
+
+指定した記事を下書き状態に戻します。`draft` を `true` に設定し、ファイル名に `draft_` プレフィックスを付与します。
+
+```sh
+hb unpublish <file> [--push|-p]
+```
+
+- `--push` / `-p`: 変更後にリモートへ即座に反映
+
+### `hb rename`
+
+記事のタイトルを変更し、frontmatter の `title` を更新するとともに、ファイル名を新しいタイトルに合わせてリネームします。
+
+```sh
+hb rename <file> --title <title> [--force]
+```
+
+- `--title`: 新しい記事タイトル（必須）
+- `--force`: リネーム先ファイルが既に存在する場合でも上書き
+
 ### `hb diff <file>`
 
 ローカルファイルとリモートのunified diffを表示します。
