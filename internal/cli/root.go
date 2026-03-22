@@ -35,6 +35,8 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newSearchCmd())
 	root.AddCommand(newOpenCmd())
 	root.AddCommand(newStatusCmd())
+	root.AddCommand(newStatsCmd())
+	root.AddCommand(newEditCmd())
 	root.AddCommand(newPublishCmd())
 	root.AddCommand(newUnpublishCmd())
 	root.AddCommand(newRenameCmd())
