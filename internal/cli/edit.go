@@ -78,9 +78,13 @@ func runEdit(cmd *cobra.Command, path string, autoPush bool) error {
 	if local.Frontmatter.EditURL != "" {
 		ctx := cmd.Context()
 		client, err := newClientFromConfig()
-		if err == nil {
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not fetch remote entry: %v — verify that editUrl is correct and accessible\n", err)
+		} else {
 			remote, err := client.GetEntry(ctx, local.Frontmatter.EditURL)
-			if err == nil {
+			if err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not fetch remote entry: %v — verify that editUrl is correct and accessible\n", err)
+			} else {
 				remoteArticle := article.FromEntry(remote)
 				diff, err := unifiedDiff(path, local, remoteArticle)
 				if err == nil && diff != "" {

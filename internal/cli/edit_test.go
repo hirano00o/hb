@@ -2,6 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -158,5 +161,76 @@ func TestEdit_AutoPushFlag_CallsPush(t *testing.T) {
 	_ = runEdit(tc.cmd, path, true)
 	if !pushCalled {
 		t.Error("expected newClientFromConfig to be called (push path reached)")
+	}
+}
+
+// TestEdit_WithEditURL_Remote403_WarnAndContinue verifies that when GetEntry returns 403,
+// a warning is written to stderr and the push flow continues (PUT is called).
+func TestEdit_WithEditURL_Remote403_WarnAndContinue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.md")
+
+	putCalled := false
+	getCount := 0
+	mux := http.NewServeMux()
+
+	// First GET (from edit.go diff step) returns 403.
+	// Second GET (from push.go) returns 200 so push can proceed to PUT.
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/1", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			getCount++
+			if getCount == 1 {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			writeEntryXMLFull(w, "Test", "original\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/1", r.Host),
+				"https://example.com/entry/1")
+			return
+		}
+		if r.Method == http.MethodPut {
+			putCalled = true
+			writeEntryXMLFull(w, "Test", "modified\n", false,
+				fmt.Sprintf("http://%s/user/example.hateblo.jp/atom/entry/1", r.Host),
+				"https://example.com/entry/1")
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	editHref := srv.URL + "/user/example.hateblo.jp/atom/entry/1"
+
+	modifiedContent := fmt.Sprintf("---\ntitle: Test\ndate: 2026-03-01T00:00:00Z\neditUrl: %s\nurl: https://example.com/entry/1\n---\nmodified\n", editHref)
+
+	a := &article.Article{
+		Frontmatter: article.Frontmatter{
+			Title:   "Test",
+			Date:    time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			EditURL: editHref,
+			URL:     "https://example.com/entry/1",
+		},
+		Body: "original\n",
+	}
+	if err := article.Write(path, a); err != nil {
+		t.Fatal(err)
+	}
+
+	origExec := execCommand
+	execCommand = mockModifyEditorFor(modifiedContent)
+	t.Cleanup(func() { execCommand = origExec })
+
+	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
+
+	tc := newEditTestCmd(t, nil)
+	// autoPush=true: push runs without confirmation prompt.
+	_ = runEdit(tc.cmd, path, true)
+
+	if !strings.Contains(tc.err.String(), "warning: could not fetch remote entry") {
+		t.Errorf("expected warning in stderr, got %q", tc.err.String())
+	}
+	if !putCalled {
+		t.Error("expected PUT request (push flow continued despite GET failure)")
 	}
 }
