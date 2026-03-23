@@ -42,6 +42,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newRenameCmd())
 	root.AddCommand(newScheduleCmd())
 	root.AddCommand(newUnscheduleCmd())
+	root.AddCommand(newWatchCmd())
 
 	return root
 }
