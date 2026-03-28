@@ -17,7 +17,7 @@
           version = self.shortRev or "dev";
           src = self;
           subPackages = [ "cmd/hb" ];
-          vendorHash = "sha256-TDi1c8S/KSOYaKxKoMFhSmTtrfaF0M+i0fpiiHIcLYQ=";
+          vendorHash = "sha256-DA4yV/twbODY6ePPijGUAZNEqt4fO7XHdWOJEenMQp4=";
           ldflags = [ "-s" "-w" ];
           env.CGO_ENABLED = "0";
         };
