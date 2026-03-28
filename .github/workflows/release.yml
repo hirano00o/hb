@@ -28,11 +28,14 @@ jobs:
           CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-darwin-arm64  ./cmd/hb
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64  go build -ldflags="${LDFLAGS}" -trimpath -o hb-windows-amd64.exe ./cmd/hb
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            hb-linux-amd64
-            hb-linux-arm64
-            hb-darwin-amd64
-            hb-darwin-arm64
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" \
+            --generate-notes \
+            hb-linux-amd64 \
+            hb-linux-arm64 \
+            hb-darwin-amd64 \
+            hb-darwin-arm64 \
             hb-windows-amd64.exe
