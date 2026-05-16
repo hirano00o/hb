@@ -13,7 +13,7 @@ func newTestClient(t *testing.T, mux *http.ServeMux) *Client {
 	t.Helper()
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	c := NewClient("user", "example.hateblo.jp", "key")
+	c := NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	return c
 }

@@ -20,14 +20,14 @@ type Client struct {
 }
 
 // NewClient returns a Client configured for the given credentials.
-func NewClient(hatenaID, blogID, apiKey string) *Client {
+func NewClient(hatenaID, blogID, apiKey string, timeoutSecond int) *Client {
 	return &Client{
 		hatenaID:    hatenaID,
 		blogID:      blogID,
 		apiKey:      apiKey,
 		baseURL:     "https://blog.hatena.ne.jp",
 		fotolifeURL: "https://f.hatena.ne.jp/atom/post",
-		http:        &http.Client{Timeout: 30 * time.Second},
+		http:        &http.Client{Timeout: time.Duration(timeoutSecond) * time.Second},
 	}
 }
 

@@ -57,7 +57,7 @@ func TestDelete_Confirm_Deletes(t *testing.T) {
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/1"
 	path := setupDeleteTest(t, editURL)
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -98,7 +98,7 @@ func TestDelete_Abort_NoRequest(t *testing.T) {
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/2"
 	path := setupDeleteTest(t, editURL)
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -139,7 +139,7 @@ func TestDelete_YesFlag_SkipsPrompt(t *testing.T) {
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/3"
 	path := setupDeleteTest(t, editURL)
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -174,7 +174,7 @@ func TestDelete_RemoveLocal_RemovesFile(t *testing.T) {
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/4"
 	path := setupDeleteTest(t, editURL)
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 

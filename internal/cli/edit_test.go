@@ -116,7 +116,7 @@ func TestEdit_ChangesDetected_Abort(t *testing.T) {
 	origClient := newClientFromConfig
 	t.Cleanup(func() { newClientFromConfig = origClient })
 	newClientFromConfig = func() (*hatena.Client, error) {
-		return hatena.NewClient("user", "blog", "key"), nil
+		return hatena.NewClient("user", "blog", "key", 30), nil
 	}
 
 	tc := newEditTestCmd(t, strings.NewReader("N\n"))
@@ -153,7 +153,7 @@ func TestEdit_AutoPushFlag_CallsPush(t *testing.T) {
 	newClientFromConfig = func() (*hatena.Client, error) {
 		pushCalled = true
 		// Return a dummy client; push will fail but we just verify push path is reached.
-		return hatena.NewClient("user", "blog", "key"), nil
+		return hatena.NewClient("user", "blog", "key", 30), nil
 	}
 
 	tc := newEditTestCmd(t, nil)
@@ -219,7 +219,7 @@ func TestEdit_WithEditURL_Remote403_WarnAndContinue(t *testing.T) {
 	execCommand = mockModifyEditorFor(modifiedContent)
 	t.Cleanup(func() { execCommand = origExec })
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 

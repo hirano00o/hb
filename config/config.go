@@ -19,6 +19,7 @@ type Config struct {
 	APIKey      string `yaml:"api_key,omitempty"`
 	Concurrency *int   `yaml:"concurrency,omitempty"`
 	MaxPages    *int   `yaml:"max_pages,omitempty"`
+	TimeoutSec  *int   `yaml:"timeout_sec,omitempty"`
 }
 
 // GlobalConfigPath returns the path to the global config file.
@@ -101,6 +102,9 @@ func Merge(global, project *Config) *Config {
 	if project.MaxPages != nil {
 		merged.MaxPages = project.MaxPages
 	}
+	if project.TimeoutSec != nil {
+		merged.TimeoutSec = project.TimeoutSec
+	}
 	return &merged
 }
 
@@ -155,6 +159,13 @@ func LoadMerged() (*Config, error) {
 			return nil, fmt.Errorf("HB_MAX_PAGES must be a non-negative integer, got %q", v)
 		}
 		merged.MaxPages = &n
+	}
+	if v := os.Getenv("HB_TIMEOUT_SEC"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return nil, fmt.Errorf("HB_TIMEOUT_SEC must be a non-negative integer, got %q", v)
+		}
+		merged.TimeoutSec = &n
 	}
 	return merged, nil
 }

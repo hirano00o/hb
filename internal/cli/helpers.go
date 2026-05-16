@@ -22,7 +22,11 @@ func defaultNewClientFromConfig() (*hatena.Client, error) {
 	if err := config.Validate(cfg); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
-	return hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey), nil
+	timeoutSec := defaultTimeoutSec
+	if cfg.TimeoutSec != nil {
+		timeoutSec = *cfg.TimeoutSec
+	}
+	return hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey, timeoutSec), nil
 }
 
 // confirmAction prints prompt and reads a y/Y response from stdin.

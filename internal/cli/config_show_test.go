@@ -58,4 +58,7 @@ func TestConfigShow(t *testing.T) {
 	if !strings.Contains(got, "max_pages: unlimited") {
 		t.Errorf("expected unlimited max_pages in output, got: %s", got)
 	}
+	if !strings.Contains(got, "timeout_sec: 30 (default)") {
+		t.Errorf("expected default timeout_sec in output, got: %s", got)
+	}
 }

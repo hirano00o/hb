@@ -75,7 +75,7 @@ func TestRunStatus(t *testing.T) {
 		mux := http.NewServeMux()
 		srv := httptest.NewServer(mux)
 		t.Cleanup(srv.Close)
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srv.URL)
 
 		if err := runStatus(cmd, c, dir, 0, false); err != nil {
@@ -100,7 +100,7 @@ func TestRunStatus(t *testing.T) {
 		})
 		srv := httptest.NewServer(mux)
 		t.Cleanup(srv.Close)
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, _ := newTestStatusCmd(t)
@@ -138,7 +138,7 @@ func TestRunStatus(t *testing.T) {
 			EditURL: editURL,
 		}, "local body\n")
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
@@ -179,7 +179,7 @@ func TestRunStatus(t *testing.T) {
 			EditURL: editURL,
 		}, "same body\n")
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
@@ -230,7 +230,7 @@ func TestRunStatus(t *testing.T) {
 			Draft: true,
 		}, "draft body\n")
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srvURL)
 
 		cmd, out, _ := newTestStatusCmd(t)
@@ -266,7 +266,7 @@ func TestRunStatus(t *testing.T) {
 			EditURL: srv.URL + "/user/blog/atom/entry/999",
 		}, "body\n")
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, _ := newTestStatusCmd(t)
@@ -301,7 +301,7 @@ func TestRunStatus(t *testing.T) {
 			EditURL: editURL,
 		}, "![alt](photo.jpg)\n")
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srvURL)
 
 		cmd, _, errBuf := newTestStatusCmd(t)
@@ -329,7 +329,7 @@ func TestRunStatus(t *testing.T) {
 		srv := httptest.NewServer(mux)
 		t.Cleanup(srv.Close)
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srv.URL)
 
 		cmd, _, errBuf := newTestStatusCmd(t)
@@ -358,7 +358,7 @@ func TestRunStatus(t *testing.T) {
 		srv := httptest.NewServer(mux)
 		t.Cleanup(srv.Close)
 
-		c := hatena.NewClient("user", "blog", "key")
+		c := hatena.NewClient("user", "blog", "key", 30)
 		c.SetBaseURL(srv.URL)
 
 		cmd, out, errBuf := newTestStatusCmd(t)

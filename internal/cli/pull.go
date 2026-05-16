@@ -19,7 +19,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultConcurrency = 5
+const (
+	defaultConcurrency = 5
+	defaultTimeoutSec = 30
+)
 
 func newPullCmd() *cobra.Command {
 	var force bool
@@ -61,8 +64,12 @@ func newPullCmd() *cobra.Command {
 			if cfg.MaxPages != nil {
 				maxPages = *cfg.MaxPages
 			}
+			timeoutSec := defaultTimeoutSec
+			if cfg.TimeoutSec != nil {
+				timeoutSec = *cfg.TimeoutSec
+			}
 
-			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey)
+			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey, timeoutSec)
 			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
 			return runPull(cmd, client, dir, force, from, to, concurrency, maxPages, v)
 		},

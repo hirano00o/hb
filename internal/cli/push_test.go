@@ -84,7 +84,7 @@ func TestPush_NewEntry_Create(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, "", fm, "new body\n")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -502,7 +502,7 @@ func TestPush_LocalImage_Uploaded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(blogSrv.URL)
 	c.SetFotolifeURL(fotolifeSrv.URL + "/atom/post")
 	stubClient(t, c)
@@ -581,7 +581,7 @@ func TestPush_LocalImage_RePush_NoChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(blogSrv.URL)
 	c.SetFotolifeURL(fotolifeSrv.URL + "/atom/post")
 	stubClient(t, c)
@@ -789,7 +789,7 @@ func TestPush_ScheduledAt_NewEntry(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, "", fm, "body\n")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -875,7 +875,7 @@ func TestPush_ScheduledAt_UpdateEntry(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, editURL, fm, "body\n")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -948,7 +948,7 @@ func TestPush_NewEntry_Create_UpdatesDate(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, "", fm, "body\n")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -1006,7 +1006,7 @@ func TestPush_Update_UpdatesDate(t *testing.T) {
 	}
 	path, _ := setupPushTest(t, editURL, fm, "local body\n")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -1097,7 +1097,7 @@ func TestPush_MultipleFiles_AllProcessed(t *testing.T) {
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
 	t.Setenv("HB_API_KEY", "key")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -1164,7 +1164,7 @@ func TestPush_All_ProcessesAllMD(t *testing.T) {
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
 	t.Setenv("HB_API_KEY", "key")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -1237,7 +1237,7 @@ func TestPush_MultipleFiles_ErrorContinues(t *testing.T) {
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
 	t.Setenv("HB_API_KEY", "key")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
