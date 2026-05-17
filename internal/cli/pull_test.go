@@ -326,7 +326,7 @@ func TestRunPull_Integration(t *testing.T) {
 				tt.setupDir(t, dir, srv.URL)
 			}
 
-			c := hatena.NewClient("user", "blog", "key")
+			c := hatena.NewClient("user", "blog", "key", 30)
 			c.SetBaseURL(srv.URL)
 
 			cmd, _ := newTestPullCmd(t)

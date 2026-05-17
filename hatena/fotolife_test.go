@@ -37,7 +37,7 @@ func TestUploadImage_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient("user", "example.hateblo.jp", "key")
+	c := NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetFotolifeURL(srv.URL + "/atom/post")
 
 	syntax, err := c.UploadImage(context.Background(), imgPath)
@@ -50,7 +50,7 @@ func TestUploadImage_Success(t *testing.T) {
 }
 
 func TestUploadImage_FileNotFound(t *testing.T) {
-	c := NewClient("user", "example.hateblo.jp", "key")
+	c := NewClient("user", "example.hateblo.jp", "key", 30)
 	_, err := c.UploadImage(context.Background(), "/nonexistent/photo.jpg")
 	if err == nil {
 		t.Fatal("expected error for missing file")
@@ -66,7 +66,7 @@ func TestUploadImage_FileTooLarge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient("user", "example.hateblo.jp", "key")
+	c := NewClient("user", "example.hateblo.jp", "key", 30)
 	_, err := c.UploadImage(context.Background(), imgPath)
 	if err == nil {
 		t.Fatal("expected error for oversized file")
@@ -90,7 +90,7 @@ func TestUploadImage_Unauthorized(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient("user", "example.hateblo.jp", "key")
+	c := NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetFotolifeURL(srv.URL + "/atom/post")
 
 	_, err := c.UploadImage(context.Background(), imgPath)
@@ -116,7 +116,7 @@ func TestUploadImage_ServerError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient("user", "example.hateblo.jp", "key")
+	c := NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetFotolifeURL(srv.URL + "/atom/post")
 
 	_, err := c.UploadImage(context.Background(), imgPath)

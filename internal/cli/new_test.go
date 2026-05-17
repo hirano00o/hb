@@ -243,7 +243,7 @@ func TestNew_Push(t *testing.T) {
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
 	t.Setenv("HB_API_KEY", "key")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -293,7 +293,7 @@ func TestNew_Push_FileExists_Error(t *testing.T) {
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
 	t.Setenv("HB_API_KEY", "key")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 
@@ -370,7 +370,7 @@ world
 	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
 	t.Setenv("HB_API_KEY", "key")
 
-	c := hatena.NewClient("user", "example.hateblo.jp", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
 	c.SetBaseURL(srv.URL)
 	stubClient(t, c)
 

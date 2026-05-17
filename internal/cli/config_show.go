@@ -31,6 +31,11 @@ func newConfigShowCmd() *cobra.Command {
 			} else {
 				fmt.Fprintf(out, "max_pages: unlimited\n")
 			}
+			if cfg.TimeoutSec != nil && *cfg.TimeoutSec > 0 {
+				fmt.Fprintf(out, "timeout_sec: %d\n", *cfg.TimeoutSec)
+			} else {
+				fmt.Fprintf(out, "timeout_sec: %d (default)\n", defaultTimeoutSec)
+			}
 			return nil
 		},
 	}
