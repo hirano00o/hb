@@ -110,6 +110,9 @@ func TestValidate(t *testing.T) {
 		{"no hatena_id", &config.Config{BlogID: "b", APIKey: "k"}, "hatena_id"},
 		{"no blog_id", &config.Config{HatenaID: "u", APIKey: "k"}, "blog_id"},
 		{"no api_key", &config.Config{HatenaID: "u", BlogID: "b"}, "api_key"},
+		{"positive timeout_sec", &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", TimeoutSec: intPtr(10)}, ""},
+		{"zero timeout_sec", &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", TimeoutSec: intPtr(0)}, "timeout_sec"},
+		{"negative timeout_sec", &config.Config{HatenaID: "u", BlogID: "b", APIKey: "k", TimeoutSec: intPtr(-1)}, "timeout_sec"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -399,6 +402,42 @@ func TestLoadMerged_MaxPagesEnvInvalid(t *testing.T) {
 			_, err := config.LoadMerged()
 			if err == nil {
 				t.Fatalf("expected error for HB_MAX_PAGES=%q", tt.value)
+			}
+		})
+	}
+}
+
+func TestLoadMerged_TimeoutSecEnvInvalid(t *testing.T) {
+	setupGlobalConfig := func(t *testing.T) {
+		t.Helper()
+		dir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", dir)
+		if err := os.MkdirAll(filepath.Join(dir, "hb"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "hb", "config.yaml"),
+			[]byte("hatena_id: u\nblog_id: b\napi_key: k\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Chdir(t.TempDir())
+	}
+
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"non-integer", "invalid"},
+		// 0 would disable the HTTP timeout entirely, so it is rejected.
+		{"zero", "0"},
+		{"negative", "-1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupGlobalConfig(t)
+			t.Setenv("HB_TIMEOUT_SEC", tt.value)
+			_, err := config.LoadMerged()
+			if err == nil {
+				t.Fatalf("expected error for HB_TIMEOUT_SEC=%q", tt.value)
 			}
 		})
 	}

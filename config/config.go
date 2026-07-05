@@ -162,15 +162,16 @@ func LoadMerged() (*Config, error) {
 	}
 	if v := os.Getenv("HB_TIMEOUT_SEC"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			return nil, fmt.Errorf("HB_TIMEOUT_SEC must be a non-negative integer, got %q", v)
+		if err != nil || n <= 0 {
+			return nil, fmt.Errorf("HB_TIMEOUT_SEC must be a positive integer, got %q", v)
 		}
 		merged.TimeoutSec = &n
 	}
 	return merged, nil
 }
 
-// Validate returns an error if any required field is empty.
+// Validate returns an error if any required field is empty or a numeric field
+// has an invalid value.
 func Validate(cfg *Config) error {
 	if cfg.HatenaID == "" {
 		return errors.New("hatena_id is required")
@@ -180,6 +181,11 @@ func Validate(cfg *Config) error {
 	}
 	if cfg.APIKey == "" {
 		return errors.New("api_key is required")
+	}
+	// 0 would mean "no HTTP timeout", which contradicts the documented
+	// "0 = default" reading; reject it instead of silently disabling timeouts.
+	if cfg.TimeoutSec != nil && *cfg.TimeoutSec <= 0 {
+		return errors.New("timeout_sec must be a positive integer")
 	}
 	return nil
 }

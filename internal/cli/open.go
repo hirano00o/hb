@@ -21,7 +21,9 @@ func defaultOpenBrowser(url string) error {
 	case "linux":
 		return exec.Command("xdg-open", url).Run()
 	case "windows":
-		return exec.Command("cmd", "/c", "start", url).Run()
+		// Not "cmd /c start": cmd.exe would interpret metacharacters (&, |, ^)
+		// that are valid in URL queries, and the URL originates from remote data.
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Run()
 	default:
 		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}

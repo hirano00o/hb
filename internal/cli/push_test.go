@@ -137,9 +137,9 @@ func TestPush_Draft_FlagOverridesFrontmatter(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/1"
 	fm := article.Frontmatter{
@@ -243,9 +243,9 @@ func TestPush_ConfirmPrompt_Confirm(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/3"
 	fm := article.Frontmatter{
@@ -288,9 +288,9 @@ func TestPush_ConfirmPrompt_Abort(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/4"
 	fm := article.Frontmatter{
@@ -338,9 +338,9 @@ func TestPush_YesFlag_SkipsPrompt(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/5"
 	fm := article.Frontmatter{
@@ -384,9 +384,9 @@ func TestPush_DiffDirection_LocalAsFrom(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/6"
 	fm := article.Frontmatter{
