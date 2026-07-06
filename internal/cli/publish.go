@@ -48,6 +48,10 @@ func runPublish(cmd *cobra.Command, path string, push bool) error {
 	}
 
 	local.Frontmatter.Draft = false
+	// A lingering scheduledAt would turn the next push back into a scheduled
+	// draft (see pushOne), contradicting "publish now".
+	hadSchedule := local.Frontmatter.ScheduledAt != nil
+	local.Frontmatter.ScheduledAt = nil
 
 	// Rename: remove draft_ prefix if present.
 	newPath := path
@@ -71,6 +75,9 @@ func runPublish(cmd *cobra.Command, path string, push bool) error {
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Published: %s\n", newPath)
+	if hadSchedule {
+		fmt.Fprintln(cmd.OutOrStdout(), "Cleared scheduledAt: the article is published now instead of at the scheduled time.")
+	}
 
 	if push {
 		return pushAfterStateChange(cmd, newPath)
@@ -85,6 +92,10 @@ func runUnpublish(cmd *cobra.Command, path string, push bool) error {
 	}
 
 	local.Frontmatter.Draft = true
+	// Without this, a scheduled entry would still auto-publish at the
+	// scheduled time on the next push despite being "unpublished".
+	hadSchedule := local.Frontmatter.ScheduledAt != nil
+	local.Frontmatter.ScheduledAt = nil
 
 	// Rename: add draft_ prefix if not already present.
 	newPath := path
@@ -108,6 +119,9 @@ func runUnpublish(cmd *cobra.Command, path string, push bool) error {
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Unpublished: %s\n", newPath)
+	if hadSchedule {
+		fmt.Fprintln(cmd.OutOrStdout(), "Cleared scheduledAt: the article will no longer publish at the scheduled time.")
+	}
 
 	if push {
 		return pushAfterStateChange(cmd, newPath)

@@ -86,6 +86,31 @@ func TestRunStatus(t *testing.T) {
 		}
 	})
 
+	t.Run("max_pages note on stderr", func(t *testing.T) {
+		dir := t.TempDir()
+		writeStatusMD(t, dir, "a.md", article.Frontmatter{
+			Title: "A",
+			Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		}, "body\n")
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/user/blog/atom/entry", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(buildStatusFeedXML("http://"+r.Host, nil)))
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+		c := hatena.NewClient("user", "blog", "key", 30)
+		c.SetBaseURL(srv.URL)
+
+		cmd, _, errOut := newTestStatusCmd(t)
+		if err := runStatus(cmd, c, dir, 1, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(errOut.String(), "max_pages") {
+			t.Errorf("expected max_pages note on stderr, got: %q", errOut.String())
+		}
+	})
+
 	t.Run("all untracked (no editUrl)", func(t *testing.T) {
 		dir := t.TempDir()
 		writeStatusMD(t, dir, "draft.md", article.Frontmatter{

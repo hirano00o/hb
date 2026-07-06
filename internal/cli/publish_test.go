@@ -57,6 +57,67 @@ func TestPublish_DraftFile_RemovesDraftPrefix(t *testing.T) {
 	}
 }
 
+func TestPublish_ClearsScheduledAt(t *testing.T) {
+	scheduledAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	fm := article.Frontmatter{
+		Title:       "My Post",
+		Date:        time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:       true,
+		ScheduledAt: &scheduledAt,
+	}
+	path := setupPublishTest(t, "20260301_My-Post.md", fm, "body\n")
+
+	cmd := newPublishCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	updated, err := article.Read(path)
+	if err != nil {
+		t.Fatalf("read published file: %v", err)
+	}
+	if updated.Frontmatter.ScheduledAt != nil {
+		t.Error("expected scheduledAt to be cleared by publish")
+	}
+	if !strings.Contains(out.String(), "Cleared scheduledAt") {
+		t.Errorf("expected 'Cleared scheduledAt' in output, got: %s", out.String())
+	}
+}
+
+func TestUnpublish_ClearsScheduledAt(t *testing.T) {
+	scheduledAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	fm := article.Frontmatter{
+		Title:       "My Post",
+		Date:        time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Draft:       false,
+		ScheduledAt: &scheduledAt,
+	}
+	path := setupPublishTest(t, "20260301_My-Post.md", fm, "body\n")
+
+	cmd := newUnpublishCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	newPath := filepath.Join(filepath.Dir(path), "draft_20260301_My-Post.md")
+	updated, err := article.Read(newPath)
+	if err != nil {
+		t.Fatalf("read unpublished file: %v", err)
+	}
+	if updated.Frontmatter.ScheduledAt != nil {
+		t.Error("expected scheduledAt to be cleared by unpublish")
+	}
+	if !strings.Contains(out.String(), "Cleared scheduledAt") {
+		t.Errorf("expected 'Cleared scheduledAt' in output, got: %s", out.String())
+	}
+}
+
 func TestPublish_NoDraftPrefix_NoRename(t *testing.T) {
 	fm := article.Frontmatter{
 		Title: "My Post",
