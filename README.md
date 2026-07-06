@@ -139,25 +139,26 @@ hb pull [--force|-f] [--dir <directory>] [--from <date>] [--to <date>]
 
 ファイル名衝突時（`--force` なし）は、カスタム名入力 / Enter（連番suffix自動付与）/ `s`（スキップ）から選択します。
 
-既に `editUrl` が一致するローカルファイルがある記事は自動的にスキップされます。
+既に `editUrl` が一致するローカルファイルがある記事は自動的にスキップされます。pull は**新規記事の取得専用**で、取得済みファイルの更新は行いません。取得済みファイルをリモートの最新内容に追従させるには `hb sync` を使います。
 
 `.` 始まりのディレクトリ（`.git`、`.hb` 等）はローカルファイル収集の対象から除外されます。
 
-### `hb sync <file>`
+### `hb sync`
 
-指定したローカルファイルのリモート最新版を取得します。差分を表示してから上書き確認します。
+指定したローカルファイルをリモートの最新内容で上書きします（**リモート → ローカルの単方向**）。差分を表示してから上書き確認します。逆方向（ローカルの変更をリモートへ反映）は `hb push` です。
 
 ```sh
-hb sync [--yes|-y] <file>
+hb sync [--yes|-y] [--all] [<file> ...]
 ```
 
 - `--yes` / `-y`: 確認プロンプトをスキップして上書き
+- `--all`: カレントディレクトリ以下の全 `.md` ファイルを対象にする（ファイル引数と同時指定不可）
 
 ```sh
 hb sync 20260301_my-article.md
 ```
 
-### `hb push <file>`
+### `hb push`
 
 ローカルファイルをリモートへ送信します。
 
@@ -165,15 +166,29 @@ hb sync 20260301_my-article.md
 - `editUrl` が frontmatter に**ある**場合 → 差分表示後に確認してから更新（PUT）
 
 ```sh
-hb push [--yes|-y] [--draft] <file>
+hb push [--yes|-y] [--draft] [--all] [<file> ...]
 ```
 
 - `--yes` / `-y`: 確認プロンプトをスキップ
 - `--draft`: 下書きとして投稿。frontmatter の `draft` 値と異なる場合は確認プロンプトを表示
+- `--all`: カレントディレクトリ以下の全 `.md` ファイルを対象にする（ファイル引数と同時指定不可）
 
 ```sh
 hb push 20260301_my-article.md
 ```
+
+### `hb delete <file>`
+
+frontmatter の `editUrl` が指す**リモート記事を削除**します。実行前に削除対象の URL を表示して確認します。
+
+```sh
+hb delete [--yes|-y] [--remove-local] <file>
+```
+
+- `--yes` / `-y`: 確認プロンプトをスキップ
+- `--remove-local`: リモート削除後にローカルファイルも削除
+
+`editUrl` のないファイル（未 push の記事）はエラーになります。
 
 ### `hb publish`
 
@@ -216,6 +231,8 @@ hb schedule <file> <datetime>
 
 - `<datetime>`: 予約投稿日時。RFC3339形式（`2026-04-01T12:00:00+09:00`）または `YYYY-MM-DD HH:MM:SS` 形式で指定
 
+> **注意**: `YYYY-MM-DD HH:MM:SS` 形式（タイムゾーンなし）は **UTC として解釈**されます。ローカル時刻で指定したい場合は RFC3339 形式でタイムゾーンを明示してください。
+
 ### `hb unschedule`
 
 記事の予約投稿日時をクリアします。
@@ -225,13 +242,21 @@ hb unschedule <file>
 ```
 
 
-### `hb diff <file>`
+### `hb diff`
 
 ローカルファイルとリモートのunified diffを表示します。
 
 ```sh
+hb diff [--all] [<file> ...]
+```
+
+- `--all`: カレントディレクトリ以下の全 `.md` ファイルを対象にする（ファイル引数と同時指定不可）
+
+```sh
 hb diff 20260301_my-article.md
 ```
+
+`editUrl` のないファイルはエラーにならず、未公開の新規記事である旨のメッセージを表示します。
 
 > **注意**: ローカル画像参照（`![alt](photo.jpg)` のように `http`/`https` で始まらないパス）を含む記事では、`hb push` でアップロードが完了するまで画像行に差分が表示されます。このとき stderr に `note: this file contains local images; ...` が出力されます。
 
