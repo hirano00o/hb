@@ -87,7 +87,7 @@ func TestPublish_ClearsScheduledAt(t *testing.T) {
 	}
 }
 
-func TestUnpublish_ClearsScheduledAt(t *testing.T) {
+func TestPublishUndo_ClearsScheduledAt(t *testing.T) {
 	scheduledAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	fm := article.Frontmatter{
 		Title:       "My Post",
@@ -97,10 +97,10 @@ func TestUnpublish_ClearsScheduledAt(t *testing.T) {
 	}
 	path := setupPublishTest(t, "20260301_My-Post.md", fm, "body\n")
 
-	cmd := newUnpublishCmd()
+	cmd := newPublishCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetArgs([]string{path})
+	cmd.SetArgs([]string{"--undo", path})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestPublish_NoDraftPrefix_NoRename(t *testing.T) {
 	}
 }
 
-func TestUnpublish_AddsDraftPrefix(t *testing.T) {
+func TestPublishUndo_AddsDraftPrefix(t *testing.T) {
 	fm := article.Frontmatter{
 		Title: "My Post",
 		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
@@ -152,10 +152,10 @@ func TestUnpublish_AddsDraftPrefix(t *testing.T) {
 	}
 	path := setupPublishTest(t, "20260301_My-Post.md", fm, "body\n")
 
-	cmd := newUnpublishCmd()
+	cmd := newPublishCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetArgs([]string{path})
+	cmd.SetArgs([]string{"--undo", path})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestUnpublish_AddsDraftPrefix(t *testing.T) {
 	}
 }
 
-func TestUnpublish_AlreadyHasDraftPrefix_NoRename(t *testing.T) {
+func TestPublishUndo_AlreadyHasDraftPrefix_NoRename(t *testing.T) {
 	fm := article.Frontmatter{
 		Title: "My Post",
 		Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
@@ -187,10 +187,10 @@ func TestUnpublish_AlreadyHasDraftPrefix_NoRename(t *testing.T) {
 	}
 	path := setupPublishTest(t, "draft_post.md", fm, "body\n")
 
-	cmd := newUnpublishCmd()
+	cmd := newPublishCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetArgs([]string{path})
+	cmd.SetArgs([]string{"--undo", path})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
