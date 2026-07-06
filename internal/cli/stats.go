@@ -28,33 +28,13 @@ func newStatsCmd() *cobra.Command {
 }
 
 func runStats(cmd *cobra.Command, dir string, months int, showWarnings bool) error {
-	files, err := globMD(dir)
+	locals, err := loadArticles(dir, showWarnings, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
-
-	var arts []*article.Article
-	var readErrCount int
-	for _, f := range files {
-		a, err := article.Read(f)
-		if err != nil {
-			readErrCount++
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
-			}
-			continue
-		}
-		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
-			}
-			continue
-		}
-		arts = append(arts, a)
-	}
-
-	if readErrCount > 0 && !showWarnings {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
+	arts := make([]*article.Article, 0, len(locals))
+	for _, l := range locals {
+		arts = append(arts, l.art)
 	}
 
 	total := len(arts)

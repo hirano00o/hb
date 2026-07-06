@@ -199,15 +199,13 @@ func pushFile(cmd *cobra.Command, path string) error {
 
 	fmt.Fprintf(cmd.OutOrStdout(), "[watch] pushing %s ...\n", path)
 
-	pushCmd := newPushCmd()
-	pushCmd.SetOut(cmd.OutOrStdout())
-	pushCmd.SetErr(cmd.ErrOrStderr())
-	pushCmd.SetIn(cmd.InOrStdin())
-	if cmd.Context() != nil {
-		pushCmd.SetContext(cmd.Context())
+	client, _, err := newClientFromConfig()
+	if err != nil {
+		return err
 	}
-	if err := pushCmd.Flags().Set("yes", "true"); err != nil {
-		return fmt.Errorf("set push flag: %w", err)
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return pushCmd.RunE(pushCmd, []string{path})
+	return pushOne(ctx, cmd, client, path, true, false, false)
 }

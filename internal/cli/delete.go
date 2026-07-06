@@ -27,7 +27,7 @@ func newDeleteCmd() *cobra.Command {
 				return fmt.Errorf("%s has no edit_url; push it first", path)
 			}
 
-			client, err := newClientFromConfig()
+			client, _, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}

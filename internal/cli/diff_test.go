@@ -39,7 +39,7 @@ func TestDiff_NoEditURL_NewEntry(t *testing.T) {
 	}
 }
 
-// TestDiff_NoDifferences verifies that diff prints "No differences." when local and remote match.
+// TestDiff_NoDifferences verifies that diff prints "No changes." when local and remote match.
 func TestDiff_NoDifferences(t *testing.T) {
 	const entryID = "10"
 	var srvURL string
@@ -74,8 +74,8 @@ func TestDiff_NoDifferences(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("diff failed: %v", err)
 	}
-	if !strings.Contains(out.String(), "No differences.") {
-		t.Errorf("expected 'No differences.', got: %s", out.String())
+	if !strings.Contains(out.String(), "No changes.") {
+		t.Errorf("expected 'No changes.', got: %s", out.String())
 	}
 }
 

@@ -39,6 +39,23 @@ func runGlobalInit(cmd *cobra.Command, hatenaID, blogID string) error {
 	if err != nil {
 		return err
 	}
+	return runInit(cmd, hatenaID, blogID, path, config.Validate, func(out io.Writer) {
+		fmt.Fprintf(out, "Global config saved to %s\n", path)
+	})
+}
+
+func runProjectInit(cmd *cobra.Command, hatenaID, blogID string) error {
+	const projectConfigFile = ".hb/config.yaml"
+	return runInit(cmd, hatenaID, blogID, projectConfigFile, nil, func(out io.Writer) {
+		fmt.Fprintf(out, "Project config created at %s\n", projectConfigFile)
+		fmt.Fprintln(out, "Edit it to override global settings for this project.")
+	})
+}
+
+// runInit is the shared init flow: confirm overwrite when path exists, prompt
+// for fields, validate if requested (nil skips validation, allowing partial
+// project configs), save, then print the success message.
+func runInit(cmd *cobra.Command, hatenaID, blogID, path string, validate func(*config.Config) error, printSaved func(io.Writer)) error {
 	// Use a single scanner for all stdin reads to avoid buffering issues.
 	scanner := bufio.NewScanner(cmd.InOrStdin())
 	if _, err := os.Stat(path); err == nil {
@@ -55,38 +72,15 @@ func runGlobalInit(cmd *cobra.Command, hatenaID, blogID string) error {
 	if err != nil {
 		return err
 	}
-	if err := config.Validate(cfg); err != nil {
-		return err
+	if validate != nil {
+		if err := validate(cfg); err != nil {
+			return err
+		}
 	}
 	if err := config.Save(path, cfg); err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Global config saved to %s\n", path)
-	return nil
-}
-
-func runProjectInit(cmd *cobra.Command, hatenaID, blogID string) error {
-	const projectConfigFile = ".hb/config.yaml"
-	scanner := bufio.NewScanner(cmd.InOrStdin())
-	if _, err := os.Stat(projectConfigFile); err == nil {
-		ok, err := confirmActionWithScanner(cmd, scanner, fmt.Sprintf("%s already exists. Overwrite? [y/N]: ", projectConfigFile))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
-			return nil
-		}
-	}
-	cfg, err := promptConfigWithScanner(cmd, scanner, hatenaID, blogID)
-	if err != nil {
-		return err
-	}
-	if err := config.Save(projectConfigFile, cfg); err != nil {
-		return err
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Project config created at %s\n", projectConfigFile)
-	fmt.Fprintln(cmd.OutOrStdout(), "Edit it to override global settings for this project.")
+	printSaved(cmd.OutOrStdout())
 	return nil
 }
 

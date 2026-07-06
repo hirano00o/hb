@@ -13,15 +13,9 @@ import (
 	"time"
 
 	"github.com/hirano00o/hb/article"
-	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	defaultConcurrency = 5
-	defaultTimeoutSec = 30
 )
 
 func newPullCmd() *cobra.Command {
@@ -49,12 +43,9 @@ func newPullCmd() *cobra.Command {
 				to = t
 			}
 
-			cfg, err := config.LoadMerged()
+			client, cfg, err := newClientFromConfig()
 			if err != nil {
 				return err
-			}
-			if err := config.Validate(cfg); err != nil {
-				return fmt.Errorf("config: %w", err)
 			}
 			concurrency := defaultConcurrency
 			if cfg.Concurrency != nil && *cfg.Concurrency > 0 {
@@ -64,12 +55,6 @@ func newPullCmd() *cobra.Command {
 			if cfg.MaxPages != nil {
 				maxPages = *cfg.MaxPages
 			}
-			timeoutSec := defaultTimeoutSec
-			if cfg.TimeoutSec != nil {
-				timeoutSec = *cfg.TimeoutSec
-			}
-
-			client := hatena.NewClient(cfg.HatenaID, cfg.BlogID, cfg.APIKey, timeoutSec)
 			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
 			return runPull(cmd, client, dir, force, from, to, concurrency, maxPages, v)
 		},
@@ -116,7 +101,6 @@ func runPull(cmd *cobra.Command, client *hatena.Client, dir string, force bool, 
 	eg.SetLimit(concurrency)
 
 	for _, e := range toProcess {
-		e := e
 		eg.Go(func() error {
 			select {
 			case <-ctx.Done():
@@ -259,26 +243,16 @@ func autoRename(path string) (string, error) {
 // a per-file warning is written to w, otherwise a summary count is emitted instead.
 func collectLocalEditURLs(dir string, w io.Writer, showWarnings bool) (map[string]struct{}, error) {
 	known := map[string]struct{}{}
-	files, err := globMD(dir)
+	// skipNoFrontmatter=false: editUrls must be collected from every readable
+	// file, without the "no frontmatter" warning the other commands emit.
+	arts, err := scanArticles(dir, showWarnings, w, false)
 	if err != nil {
 		return known, err
 	}
-	var readErrCount int
-	for _, f := range files {
-		a, err := article.Read(f)
-		if err != nil {
-			readErrCount++
-			if showWarnings {
-				fmt.Fprintf(w, "warning: failed to read %s: %v (skipping)\n", f, err)
-			}
-			continue
+	for _, la := range arts {
+		if la.art.Frontmatter.EditURL != "" {
+			known[la.art.Frontmatter.EditURL] = struct{}{}
 		}
-		if a.Frontmatter.EditURL != "" {
-			known[a.Frontmatter.EditURL] = struct{}{}
-		}
-	}
-	if readErrCount > 0 && !showWarnings {
-		fmt.Fprintf(w, "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
 	}
 	return known, nil
 }

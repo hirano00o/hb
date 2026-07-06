@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/hirano00o/hb/article"
-	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 )
@@ -18,11 +17,7 @@ func newStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show sync status of local articles against remote",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := newClientFromConfig()
-			if err != nil {
-				return err
-			}
-			cfg, err := config.LoadMerged()
+			client, cfg, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
@@ -40,6 +35,9 @@ func newStatusCmd() *cobra.Command {
 }
 
 func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, maxPages int, showWarnings bool) error {
+	// Glob before loadArticles (which globs again): an empty directory must exit
+	// before "Fetching remote entries..." is printed, and loadArticles alone
+	// cannot distinguish no-files from all-files-skipped.
 	files, err := globMD(dir)
 	if err != nil {
 		return err
@@ -52,33 +50,9 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, maxPages i
 
 	fmt.Fprintln(cmd.ErrOrStderr(), "Fetching remote entries...")
 
-	// Collect local articles, skipping unreadable or frontmatter-less files.
-	type localEntry struct {
-		path string
-		art  *article.Article
-	}
-	var locals []localEntry
-	var readErrCount int
-	for _, f := range files {
-		a, err := article.Read(f)
-		if err != nil {
-			readErrCount++
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
-			}
-			continue
-		}
-		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
-			}
-			continue
-		}
-		locals = append(locals, localEntry{path: f, art: a})
-	}
-
-	if readErrCount > 0 && !showWarnings {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
+	locals, err := loadArticles(dir, showWarnings, cmd.ErrOrStderr())
+	if err != nil {
+		return err
 	}
 
 	if len(locals) == 0 {

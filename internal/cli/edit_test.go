@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
 	"github.com/spf13/cobra"
 )
@@ -115,8 +116,8 @@ func TestEdit_ChangesDetected_Abort(t *testing.T) {
 	// Stub newClientFromConfig; article has no editUrl so GetEntry is not called.
 	origClient := newClientFromConfig
 	t.Cleanup(func() { newClientFromConfig = origClient })
-	newClientFromConfig = func() (*hatena.Client, error) {
-		return hatena.NewClient("user", "blog", "key", 30), nil
+	newClientFromConfig = func() (*hatena.Client, *config.Config, error) {
+		return hatena.NewClient("user", "blog", "key", 30), &config.Config{}, nil
 	}
 
 	tc := newEditTestCmd(t, strings.NewReader("N\n"))
@@ -150,10 +151,10 @@ func TestEdit_AutoPushFlag_CallsPush(t *testing.T) {
 	pushCalled := false
 	origClient := newClientFromConfig
 	t.Cleanup(func() { newClientFromConfig = origClient })
-	newClientFromConfig = func() (*hatena.Client, error) {
+	newClientFromConfig = func() (*hatena.Client, *config.Config, error) {
 		pushCalled = true
 		// Return a dummy client; push will fail but we just verify push path is reached.
-		return hatena.NewClient("user", "blog", "key", 30), nil
+		return hatena.NewClient("user", "blog", "key", 30), &config.Config{}, nil
 	}
 
 	tc := newEditTestCmd(t, nil)

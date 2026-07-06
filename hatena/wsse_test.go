@@ -34,10 +34,7 @@ func TestGenerateWSSE_KnownInput(t *testing.T) {
 	expectedDigest := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	expectedNonce := base64.StdEncoding.EncodeToString(nonce)
 
-	header, err := generateWSSE("user", apiKey, nonce, created)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	header := generateWSSE("user", apiKey, nonce, created)
 	if !strings.Contains(header, `PasswordDigest="`+expectedDigest+`"`) {
 		t.Errorf("wrong digest in header: %s", header)
 	}

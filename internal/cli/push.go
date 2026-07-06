@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
-	"time"
 
 	"github.com/hirano00o/hb/article"
 	"github.com/hirano00o/hb/hatena"
@@ -26,23 +24,12 @@ func newPushCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			if all && len(args) > 0 {
-				return fmt.Errorf("--all and file arguments are mutually exclusive")
-			}
-			if !all && len(args) == 0 {
-				return fmt.Errorf("at least one file argument is required, or use --all")
+			paths, err := resolveTargetPaths(args, all)
+			if err != nil {
+				return err
 			}
 
-			paths := args
-			if all {
-				var err error
-				paths, err = globMD(".")
-				if err != nil {
-					return fmt.Errorf("glob: %w", err)
-				}
-			}
-
-			client, err := newClientFromConfig()
+			client, _, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
@@ -96,17 +83,9 @@ func pushOne(ctx context.Context, cmd *cobra.Command, client *hatena.Client, pat
 		local.Frontmatter.Draft = draft
 	}
 
-	// Upload local images in the body, replacing them with hatena:syntax.
-	// The original local.Body is preserved; pushBody is used only for the API call.
-	pushBody, err := article.ReplaceLocalImages(ctx, local.Body, filepath.Dir(path), client.UploadImage)
+	pushEntry, pushBody, err := preparePushEntry(ctx, client, local, path)
 	if err != nil {
-		return fmt.Errorf("replace images: %w", err)
-	}
-	pushEntry := local.ToEntry()
-	pushEntry.Content = pushBody
-	// scheduledAt requires draft=yes on the API side regardless of the local draft field.
-	if local.Frontmatter.ScheduledAt != nil {
-		pushEntry.Draft = true
+		return err
 	}
 
 	// No editUrl → new entry, POST
@@ -115,15 +94,7 @@ func pushOne(ctx context.Context, cmd *cobra.Command, client *hatena.Client, pat
 		if err != nil {
 			return err
 		}
-		// Update local file with the assigned editUrl, url, and date
-		local.Frontmatter.EditURL = created.EditURL
-		local.Frontmatter.URL = created.URL
-		local.Frontmatter.Date = created.Date
-		if err := article.Write(path, local); err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Created: %s\n", created.URL)
-		return nil
+		return writeBackAndReport(cmd, path, local, created, "Created")
 	}
 
 	// Has editUrl → fetch remote and compare
@@ -163,45 +134,34 @@ func pushOne(ctx context.Context, cmd *cobra.Command, client *hatena.Client, pat
 	if err != nil {
 		return err
 	}
-	local.Frontmatter.EditURL = updated.EditURL
-	local.Frontmatter.URL = updated.URL
-	local.Frontmatter.Date = updated.Date
+	return writeBackAndReport(cmd, path, local, updated, "Updated")
+}
+
+// preparePushEntry uploads local images and builds the API entry
+// (scheduledAt forces draft=yes on the API side).
+// The original local.Body is preserved; pushBody is used only for the API call
+// and returned separately so callers can diff against the remote body.
+func preparePushEntry(ctx context.Context, client *hatena.Client, local *article.Article, path string) (entry *hatena.Entry, pushBody string, err error) {
+	pushBody, err = article.ReplaceLocalImages(ctx, local.Body, filepath.Dir(path), client.UploadImage)
+	if err != nil {
+		return nil, "", fmt.Errorf("replace images: %w", err)
+	}
+	entry = local.ToEntry()
+	entry.Content = pushBody
+	if local.Frontmatter.ScheduledAt != nil {
+		entry.Draft = true
+	}
+	return entry, pushBody, nil
+}
+
+// writeBackAndReport persists the server-assigned editUrl/url/date and reports the result.
+func writeBackAndReport(cmd *cobra.Command, path string, local *article.Article, result *hatena.Entry, verb string) error {
+	local.Frontmatter.EditURL = result.EditURL
+	local.Frontmatter.URL = result.URL
+	local.Frontmatter.Date = result.Date
 	if err := article.Write(path, local); err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Updated: %s\n", updated.URL)
+	fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", verb, result.URL)
 	return nil
-}
-
-// hasChanges returns true if the local article differs from the remote in any field.
-func hasChanges(local, remote *article.Article) bool {
-	lf, rf := local.Frontmatter, remote.Frontmatter
-	// A scheduled entry is stored as draft=yes on the API side regardless of
-	// the local draft field (see pushOne), so compare draft under the same
-	// normalization; otherwise a scheduled post reports a permanent diff.
-	lDraft, rDraft := lf.Draft, rf.Draft
-	if lf.ScheduledAt != nil {
-		lDraft = true
-	}
-	if rf.ScheduledAt != nil {
-		rDraft = true
-	}
-	return local.Body != remote.Body ||
-		!lf.Date.Equal(rf.Date) ||
-		lf.Title != rf.Title ||
-		lDraft != rDraft ||
-		!slices.Equal(lf.Category, rf.Category) ||
-		lf.CustomURLPath != rf.CustomURLPath ||
-		!scheduledAtEqual(lf.ScheduledAt, rf.ScheduledAt)
-}
-
-// scheduledAtEqual compares two *time.Time values for equality, treating nil as zero time.
-func scheduledAtEqual(a, b *time.Time) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return a.Equal(*b)
 }

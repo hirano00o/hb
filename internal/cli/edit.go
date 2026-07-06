@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -77,7 +78,7 @@ func runEdit(cmd *cobra.Command, path string, autoPush bool) error {
 
 	if local.Frontmatter.EditURL != "" {
 		ctx := cmd.Context()
-		client, err := newClientFromConfig()
+		client, _, err := newClientFromConfig()
 		if err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not fetch remote entry: %v — verify that editUrl is correct and accessible\n", err)
 		} else {
@@ -109,16 +110,15 @@ func runEdit(cmd *cobra.Command, path string, autoPush bool) error {
 	return doPush(cmd, path)
 }
 
-// doPush pushes the file at path by re-using the push command's RunE with --yes.
+// doPush pushes the file at path, skipping push's confirmation prompt.
 func doPush(cmd *cobra.Command, path string) error {
-	pushCmd := newPushCmd()
-	pushCmd.SetOut(cmd.OutOrStdout())
-	pushCmd.SetErr(cmd.ErrOrStderr())
-	pushCmd.SetIn(cmd.InOrStdin())
-	pushCmd.SetContext(cmd.Context())
-	// Mark --yes so the push command skips its own confirmation prompt.
-	if err := pushCmd.Flags().Set("yes", "true"); err != nil {
-		return fmt.Errorf("set push flag: %w", err)
+	client, _, err := newClientFromConfig()
+	if err != nil {
+		return err
 	}
-	return pushCmd.RunE(pushCmd, []string{path})
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return pushOne(ctx, cmd, client, path, true, false, false)
 }

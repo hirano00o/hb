@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/config"
 	"github.com/hirano00o/hb/hatena"
 )
 
@@ -41,7 +42,7 @@ func stubClient(t *testing.T, c *hatena.Client) {
 	t.Helper()
 	orig := newClientFromConfig
 	t.Cleanup(func() { newClientFromConfig = orig })
-	newClientFromConfig = func() (*hatena.Client, error) { return c, nil }
+	newClientFromConfig = func() (*hatena.Client, *config.Config, error) { return c, &config.Config{}, nil }
 }
 
 // TestPush_NewEntry_Create verifies that a file with no editUrl triggers a POST and
