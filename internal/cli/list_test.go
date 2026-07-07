@@ -66,7 +66,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false, false, "", false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if buf.String() != "No articles found.\n" {
@@ -84,7 +84,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false, false, "", false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -108,7 +108,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, true, false, false, "", false, false); err != nil {
+		if err := runList(cmd, dir, true, false, false, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -130,7 +130,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, true, false, "", false, false); err != nil {
+		if err := runList(cmd, dir, false, true, false, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -152,7 +152,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&out)
 		cmd.SetErr(&errBuf)
 
-		if err := runList(cmd, dir, false, false, true, "", false, false); err != nil {
+		if err := runList(cmd, dir, false, false, true, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if !strings.Contains(errBuf.String(), "warning:") {
@@ -173,7 +173,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&out)
 		cmd.SetErr(&errBuf)
 
-		if err := runList(cmd, dir, false, false, false, "", false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if strings.Contains(errBuf.String(), "failed to read") {
@@ -192,7 +192,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), true, true, false, "", false, false)
+		err := runList(cmd, t.TempDir(), true, true, false, "", false, false, "")
 		if err == nil {
 			t.Fatal("expected error for --draft + --published")
 		}
@@ -211,7 +211,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false, false, "Go", false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false, "Go", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -234,7 +234,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false, false, "", true, false); err != nil {
+		if err := runList(cmd, dir, false, false, false, "", true, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -256,7 +256,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), true, false, false, "", true, false)
+		err := runList(cmd, t.TempDir(), true, false, false, "", true, false, "")
 		if err == nil {
 			t.Fatal("expected error for --categories + --draft")
 		}
@@ -270,7 +270,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), false, true, false, "", true, false)
+		err := runList(cmd, t.TempDir(), false, true, false, "", true, false, "")
 		if err == nil {
 			t.Fatal("expected error for --categories + --published")
 		}
@@ -284,7 +284,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), false, false, false, "Go", true, false)
+		err := runList(cmd, t.TempDir(), false, false, false, "Go", true, false, "")
 		if err == nil {
 			t.Fatal("expected error for --categories + --category")
 		}
@@ -298,7 +298,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), false, false, false, "", true, true)
+		err := runList(cmd, t.TempDir(), false, false, false, "", true, true, "")
 		if err == nil {
 			t.Fatal("expected error for --categories + --scheduled")
 		}
@@ -317,7 +317,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false, false, "", false, true); err != nil {
+		if err := runList(cmd, dir, false, false, false, "", false, true, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
@@ -337,7 +337,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), true, false, false, "", false, true)
+		err := runList(cmd, t.TempDir(), true, false, false, "", false, true, "")
 		if err == nil {
 			t.Fatal("expected error for --scheduled + --draft")
 		}
@@ -351,7 +351,7 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
 
-		err := runList(cmd, t.TempDir(), false, true, false, "", false, true)
+		err := runList(cmd, t.TempDir(), false, true, false, "", false, true, "")
 		if err == nil {
 			t.Fatal("expected error for --scheduled + --published")
 		}
@@ -369,12 +369,110 @@ func TestRunList(t *testing.T) {
 		cmd.SetOut(&buf)
 		cmd.SetErr(&bytes.Buffer{})
 
-		if err := runList(cmd, dir, false, false, false, "", false, false); err != nil {
+		if err := runList(cmd, dir, false, false, false, "", false, false, ""); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		out := buf.String()
 		if !strings.Contains(out, "SCHEDULED_AT") {
 			t.Errorf("expected SCHEDULED_AT column header, got %q", out)
+		}
+	})
+
+	t.Run("query matches title case-insensitively", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "a.md", "---\ntitle: Go Programming\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\nsome body text\n")
+		writeMD(t, dir, "b.md", "---\ntitle: Other Article\ndate: 2026-02-01T00:00:00Z\ndraft: false\n---\nanother body\n")
+
+		cmd := &cobra.Command{}
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := runList(cmd, dir, false, false, false, "", false, false, "go"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		out := buf.String()
+		if !strings.Contains(out, "Go Programming") {
+			t.Errorf("expected Go Programming in output, got %q", out)
+		}
+		if strings.Contains(out, "Other Article") {
+			t.Errorf("expected Other Article to be excluded, got %q", out)
+		}
+	})
+
+	t.Run("query matches body", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "a.md", "---\ntitle: Article One\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\nThis is about golang\n")
+		writeMD(t, dir, "b.md", "---\ntitle: Article Two\ndate: 2026-02-01T00:00:00Z\ndraft: false\n---\nThis is about python\n")
+
+		cmd := &cobra.Command{}
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := runList(cmd, dir, false, false, false, "", false, false, "golang"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		out := buf.String()
+		if !strings.Contains(out, "Article One") {
+			t.Errorf("expected Article One in output, got %q", out)
+		}
+		if strings.Contains(out, "Article Two") {
+			t.Errorf("expected Article Two to be excluded, got %q", out)
+		}
+	})
+
+	t.Run("query with no match prints no articles found", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "a.md", "---\ntitle: Unrelated\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\nunrelated body\n")
+
+		cmd := &cobra.Command{}
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&bytes.Buffer{})
+
+		if err := runList(cmd, dir, false, false, false, "", false, false, "nonexistent"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if buf.String() != "No articles found.\n" {
+			t.Errorf("expected 'No articles found.\\n', got %q", buf.String())
+		}
+	})
+
+	t.Run("query combines with draft filter", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMD(t, dir, "draft.md", "---\ntitle: Keyword Draft\ndate: 2026-01-01T00:00:00Z\ndraft: true\n---\nbody\n")
+		writeMD(t, dir, "pub.md", "---\ntitle: Keyword Published\ndate: 2026-02-01T00:00:00Z\ndraft: false\n---\nbody\n")
+
+		root := NewRootCmd()
+		var buf bytes.Buffer
+		root.SetOut(&buf)
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs([]string{"list", "--dir", dir, "-q", "keyword", "--draft"})
+
+		if err := root.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		out := buf.String()
+		if !strings.Contains(out, "Keyword Draft") {
+			t.Errorf("expected Keyword Draft in output, got %q", out)
+		}
+		if strings.Contains(out, "Keyword Published") {
+			t.Errorf("expected Keyword Published to be filtered out, got %q", out)
+		}
+	})
+
+	t.Run("categories conflicts with query flag", func(t *testing.T) {
+		cmd := &cobra.Command{}
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+
+		err := runList(cmd, t.TempDir(), false, false, false, "", true, false, "keyword")
+		if err == nil {
+			t.Fatal("expected error for --categories + --query")
+		}
+		if !strings.Contains(err.Error(), "--categories cannot be used with") {
+			t.Errorf("unexpected error message: %v", err)
 		}
 	})
 }

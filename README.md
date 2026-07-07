@@ -195,19 +195,10 @@ hb delete [--yes|-y] [--remove-local] <file>
 指定した記事を公開状態にします。`draft` を `false` に設定し、ファイル名の `draft_` プレフィックスを除去します。`scheduledAt` が設定されている場合はクリアします（予約時刻ではなく即時公開の意図とみなします）。
 
 ```sh
-hb publish <file> [--push|-p]
+hb publish <file> [--undo] [--push|-p]
 ```
 
-- `--push` / `-p`: 変更後にリモートへ即座に反映
-
-### `hb unpublish`
-
-指定した記事を下書き状態に戻します。`draft` を `true` に設定し、ファイル名に `draft_` プレフィックスを付与します。`scheduledAt` が設定されている場合はクリアします（残したままだと次回 push で予約投稿として再登録されるため）。
-
-```sh
-hb unpublish <file> [--push|-p]
-```
-
+- `--undo`: 記事を下書き状態に戻します。`draft` を `true` に設定し、ファイル名に `draft_` プレフィックスを付与します。`scheduledAt` が設定されている場合はクリアします（残したままだと次回 push で予約投稿として再登録されるため）
 - `--push` / `-p`: 変更後にリモートへ即座に反映
 
 ### `hb rename`
@@ -223,24 +214,19 @@ hb rename <file> --title <title> [--force]
 
 ### `hb schedule`
 
-記事の予約投稿日時を設定します。
+記事の予約投稿日時を設定またはクリアします。
 
 ```sh
 hb schedule <file> <datetime>
+hb schedule --clear <file>
 ```
 
 - `<datetime>`: 予約投稿日時。RFC3339形式（`2026-04-01T12:00:00+09:00`）または `YYYY-MM-DD HH:MM:SS` 形式で指定
+- `--clear`: `scheduledAt` をクリア。`<datetime>` と同時に指定できません
+
+成功時は設定で `Scheduled: <file> (<UTC の RFC3339>)`、クリアで `Unscheduled: <file>` を出力します。
 
 > **注意**: `YYYY-MM-DD HH:MM:SS` 形式（タイムゾーンなし）は **UTC として解釈**されます。ローカル時刻で指定したい場合は RFC3339 形式でタイムゾーンを明示してください。
-
-### `hb unschedule`
-
-記事の予約投稿日時をクリアします。
-
-```sh
-hb unschedule <file>
-```
-
 
 ### `hb diff`
 
@@ -289,7 +275,7 @@ hb new --push -t "公開記事"
 ローカルの記事一覧をテーブル形式で表示します。日付の降順（新しい記事が上）でソートされます。
 
 ```sh
-hb list [--dir <directory>] [--draft] [--published] [--scheduled] [--category <name>] [--categories]
+hb list [--dir <directory>] [--draft] [--published] [--scheduled] [--category <name>] [--categories] [--query|-q <keyword>]
 ```
 
 - `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
@@ -298,24 +284,11 @@ hb list [--dir <directory>] [--draft] [--published] [--scheduled] [--category <n
 - `--category <name>`: 指定カテゴリの記事のみ表示
 - `--categories`: 全カテゴリを一覧表示
 - `--scheduled`: 予約投稿記事のみ表示
+- `--query <keyword>` / `-q`: タイトルまたは本文にキーワードを含む記事のみ表示（大文字小文字を区別しない）。他のフィルタとは AND で組み合わせられます
 
-`--draft` と `--published` は同時に指定できません。`--scheduled` は `--draft`、`--published` と同時に指定できません。`--categories` は `--draft`、`--published`、`--category`、`--scheduled` と同時に指定できません。
+`--draft` と `--published` は同時に指定できません。`--scheduled` は `--draft`、`--published` と同時に指定できません。`--categories` は `--draft`、`--published`、`--category`、`--scheduled`、`--query` と同時に指定できません。
 
 `.` 始まりのディレクトリ（`.git`、`.hb` 等）は走査対象から除外されます。フロントマターのないファイルはサイレントにスキップされます。読み取りに失敗したファイルはデフォルトで件数サマリーを stderr に表示し、`--verbose` で詳細表示できます。
-
-### `hb search`
-
-ローカルの記事をキーワード検索します。大文字小文字を区別しません。
-
-```sh
-hb search <query> [--dir <directory>] [--title] [--body]
-```
-
-- `--dir`: スキャン先ディレクトリ（デフォルト: カレントディレクトリ）
-- `--title`: タイトルのみ検索
-- `--body`: 本文のみ検索
-
-フラグなしの場合はタイトルと本文のOR検索を行います。`--title` と `--body` を両方指定するとAND検索（タイトルと本文の両方に一致）になります。
 
 ### `hb open <file>`
 

@@ -16,13 +16,14 @@ func newListCmd() *cobra.Command {
 	var filterCategory string
 	var listCategories bool
 	var scheduledOnly bool
+	var query string
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List local articles",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			v, _ := cmd.Root().PersistentFlags().GetBool("verbose")
-			return runList(cmd, dir, draftOnly, publishedOnly, v, filterCategory, listCategories, scheduledOnly)
+			return runList(cmd, dir, draftOnly, publishedOnly, v, filterCategory, listCategories, scheduledOnly, query)
 		},
 	}
 
@@ -32,16 +33,17 @@ func newListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&filterCategory, "category", "", "Show only articles containing this category")
 	cmd.Flags().BoolVar(&listCategories, "categories", false, "List all categories with article counts")
 	cmd.Flags().BoolVar(&scheduledOnly, "scheduled", false, "Show only scheduled articles")
+	cmd.Flags().StringVarP(&query, "query", "q", "", "Show only articles whose title or body contains this keyword (case-insensitive)")
 	return cmd
 }
 
-func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, showWarnings bool, filterCategory string, listCategories bool, scheduledOnly bool) error {
+func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, showWarnings bool, filterCategory string, listCategories bool, scheduledOnly bool, query string) error {
 	// --categories is a summary mode: it aggregates article counts per category across all
 	// articles and returns early before any article-level filter is applied (see below).
-	// Allowing --draft/--published/--category/--scheduled together would silently ignore those
-	// filters, producing counts that do not match what the user asked for.
-	if listCategories && (draftOnly || publishedOnly || filterCategory != "" || scheduledOnly) {
-		return fmt.Errorf("--categories cannot be used with --draft, --published, --category, or --scheduled")
+	// Allowing --draft/--published/--category/--scheduled/--query together would silently
+	// ignore those filters, producing counts that do not match what the user asked for.
+	if listCategories && (draftOnly || publishedOnly || filterCategory != "" || scheduledOnly || query != "") {
+		return fmt.Errorf("--categories cannot be used with --draft, --published, --category, --scheduled, or --query")
 	}
 	// The draft field is a boolean, so --draft (draft=true) and --published (draft=false)
 	// are mutually exclusive states. No article can satisfy both at once.
@@ -91,7 +93,8 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, show
 		return w.Flush()
 	}
 
-	// Apply draft/published/category/scheduled filters after collecting all articles for --categories.
+	// Apply draft/published/category/scheduled/query filters after collecting all articles for --categories.
+	q := strings.ToLower(query)
 	var filtered []*article.Article
 	for _, a := range articles {
 		if draftOnly && !a.Frontmatter.Draft {
@@ -113,6 +116,9 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, show
 			}
 		}
 		if scheduledOnly && a.Frontmatter.ScheduledAt == nil {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(a.Frontmatter.Title), q) && !strings.Contains(strings.ToLower(a.Body), q) {
 			continue
 		}
 		filtered = append(filtered, a)

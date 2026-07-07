@@ -15,34 +15,34 @@ var datetimeLayouts = []string{
 }
 
 func newScheduleCmd() *cobra.Command {
+	var clear bool
+
 	cmd := &cobra.Command{
-		Use:   "schedule <file> <datetime>",
-		Short: "Set scheduledAt in a local article's frontmatter",
+		Use:   "schedule <file> [<datetime>]",
+		Short: "Set or clear scheduledAt in a local article's frontmatter",
 		Long: `Set the scheduledAt field in the article's frontmatter.
 
 Accepted datetime formats:
   RFC3339:          2026-04-01T12:00:00Z
-  Space-separated:  2026-04-01 12:00:00  (interpreted as UTC)`,
-		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			path := args[0]
-			rawDatetime := args[1]
-			return runSchedule(path, rawDatetime)
-		},
-	}
-	return cmd
-}
+  Space-separated:  2026-04-01 12:00:00  (interpreted as UTC)
 
-func newUnscheduleCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "unschedule <file>",
-		Short: "Clear scheduledAt from a local article's frontmatter",
-		Args:  cobra.ExactArgs(1),
+With --clear, remove scheduledAt instead; no <datetime> is accepted.`,
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := args[0]
-			return runUnschedule(path)
+			if clear {
+				if len(args) != 1 {
+					return fmt.Errorf("--clear cannot be used with a <datetime> argument")
+				}
+				return runSchedule(cmd, args[0], "", true)
+			}
+			if len(args) != 2 {
+				return fmt.Errorf("<datetime> is required unless --clear is given")
+			}
+			return runSchedule(cmd, args[0], args[1], false)
 		},
 	}
+
+	cmd.Flags().BoolVar(&clear, "clear", false, "Clear scheduledAt instead of setting it")
 	return cmd
 }
 
@@ -57,10 +57,14 @@ func parseScheduleDatetime(raw string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("invalid datetime %q: accepted formats are RFC3339 (2006-01-02T15:04:05Z) or \"2006-01-02 15:04:05\"", raw)
 }
 
-func runSchedule(path, rawDatetime string) error {
-	t, err := parseScheduleDatetime(rawDatetime)
-	if err != nil {
-		return err
+func runSchedule(cmd *cobra.Command, path, rawDatetime string, clear bool) error {
+	var scheduledAt *time.Time
+	if !clear {
+		t, err := parseScheduleDatetime(rawDatetime)
+		if err != nil {
+			return err
+		}
+		scheduledAt = &t
 	}
 
 	a, err := article.Read(path)
@@ -68,22 +72,15 @@ func runSchedule(path, rawDatetime string) error {
 		return fmt.Errorf("read %s: %w", path, err)
 	}
 
-	a.Frontmatter.ScheduledAt = &t
+	a.Frontmatter.ScheduledAt = scheduledAt
 	if err := article.Write(path, a); err != nil {
 		return err
 	}
-	return nil
-}
 
-func runUnschedule(path string) error {
-	a, err := article.Read(path)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", path, err)
-	}
-
-	a.Frontmatter.ScheduledAt = nil
-	if err := article.Write(path, a); err != nil {
-		return err
+	if clear {
+		fmt.Fprintf(cmd.OutOrStdout(), "Unscheduled: %s\n", path)
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "Scheduled: %s (%s)\n", path, scheduledAt.Format(time.RFC3339))
 	}
 	return nil
 }

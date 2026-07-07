@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/spf13/cobra"
 )
 
 func TestRunSchedule(t *testing.T) {
@@ -16,7 +17,11 @@ func TestRunSchedule(t *testing.T) {
 		path := filepath.Join(dir, "article.md")
 		writeMD(t, dir, "article.md", "---\ntitle: Test\ndate: 2026-01-01T00:00:00Z\ndraft: true\n---\nbody\n")
 
-		if err := runSchedule(path, "2026-04-01T12:00:00Z"); err != nil {
+		cmd := &cobra.Command{}
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+
+		if err := runSchedule(cmd, path, "2026-04-01T12:00:00Z", false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -30,6 +35,10 @@ func TestRunSchedule(t *testing.T) {
 		got := a.Frontmatter.ScheduledAt.UTC().Format("2006-01-02T15:04:05Z")
 		if got != "2026-04-01T12:00:00Z" {
 			t.Errorf("expected scheduledAt=2026-04-01T12:00:00Z, got %s", got)
+		}
+		want := "Scheduled: " + path + " (2026-04-01T12:00:00Z)\n"
+		if buf.String() != want {
+			t.Errorf("expected output %q, got %q", want, buf.String())
 		}
 	})
 
@@ -38,7 +47,11 @@ func TestRunSchedule(t *testing.T) {
 		path := filepath.Join(dir, "article.md")
 		writeMD(t, dir, "article.md", "---\ntitle: Test\ndate: 2026-01-01T00:00:00Z\ndraft: true\n---\nbody\n")
 
-		if err := runSchedule(path, "2026-04-01 12:00:00"); err != nil {
+		cmd := &cobra.Command{}
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+
+		if err := runSchedule(cmd, path, "2026-04-01 12:00:00", false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -53,6 +66,9 @@ func TestRunSchedule(t *testing.T) {
 		if got != "2026-04-01T12:00:00Z" {
 			t.Errorf("expected scheduledAt=2026-04-01T12:00:00Z, got %s", got)
 		}
+		if !strings.Contains(buf.String(), "Scheduled: "+path+" (2026-04-01T12:00:00Z)") {
+			t.Errorf("expected 'Scheduled:' with stored UTC time in output, got %q", buf.String())
+		}
 	})
 
 	t.Run("returns error for invalid datetime format", func(t *testing.T) {
@@ -60,7 +76,10 @@ func TestRunSchedule(t *testing.T) {
 		path := filepath.Join(dir, "article.md")
 		writeMD(t, dir, "article.md", "---\ntitle: Test\ndate: 2026-01-01T00:00:00Z\ndraft: true\n---\nbody\n")
 
-		err := runSchedule(path, "not-a-date")
+		cmd := &cobra.Command{}
+		cmd.SetOut(&bytes.Buffer{})
+
+		err := runSchedule(cmd, path, "not-a-date", false)
 		if err == nil {
 			t.Fatal("expected error for invalid datetime, got nil")
 		}
@@ -75,7 +94,10 @@ func TestRunSchedule(t *testing.T) {
 		// no editUrl field
 		writeMD(t, dir, "article.md", "---\ntitle: No EditURL\ndate: 2026-02-01T00:00:00Z\ndraft: true\n---\ncontent\n")
 
-		if err := runSchedule(path, "2026-05-01T09:00:00Z"); err != nil {
+		cmd := &cobra.Command{}
+		cmd.SetOut(&bytes.Buffer{})
+
+		if err := runSchedule(cmd, path, "2026-05-01T09:00:00Z", false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -90,39 +112,48 @@ func TestRunSchedule(t *testing.T) {
 			t.Errorf("expected editUrl to remain empty, got %q", a.Frontmatter.EditURL)
 		}
 	})
-}
 
-func TestRunUnschedule(t *testing.T) {
-	t.Run("clears scheduledAt", func(t *testing.T) {
+	t.Run("clear clears scheduledAt", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "article.md")
 		writeMD(t, dir, "article.md", "---\ntitle: Test\ndate: 2026-01-01T00:00:00Z\ndraft: true\nscheduledAt: 2026-04-01T12:00:00Z\n---\nbody\n")
 
-		if err := runUnschedule(path); err != nil {
+		cmd := &cobra.Command{}
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+
+		if err := runSchedule(cmd, path, "", true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
 		a, err := article.Read(path)
 		if err != nil {
-			t.Fatalf("read after unschedule: %v", err)
+			t.Fatalf("read after clear: %v", err)
 		}
 		if a.Frontmatter.ScheduledAt != nil {
 			t.Errorf("expected scheduledAt to be nil, got %v", a.Frontmatter.ScheduledAt)
 		}
+		want := "Unscheduled: " + path + "\n"
+		if buf.String() != want {
+			t.Errorf("expected output %q, got %q", want, buf.String())
+		}
 	})
 
-	t.Run("works when scheduledAt is already nil", func(t *testing.T) {
+	t.Run("clear works when scheduledAt is already nil", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "article.md")
 		writeMD(t, dir, "article.md", "---\ntitle: Test\ndate: 2026-01-01T00:00:00Z\ndraft: false\n---\nbody\n")
 
-		if err := runUnschedule(path); err != nil {
+		cmd := &cobra.Command{}
+		cmd.SetOut(&bytes.Buffer{})
+
+		if err := runSchedule(cmd, path, "", true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
 		a, err := article.Read(path)
 		if err != nil {
-			t.Fatalf("read after unschedule: %v", err)
+			t.Fatalf("read after clear: %v", err)
 		}
 		if a.Frontmatter.ScheduledAt != nil {
 			t.Errorf("expected scheduledAt to remain nil, got %v", a.Frontmatter.ScheduledAt)
@@ -155,9 +186,12 @@ func TestScheduleCmd_Integration(t *testing.T) {
 		if a.Frontmatter.ScheduledAt == nil {
 			t.Fatal("expected scheduledAt to be set")
 		}
+		if !strings.Contains(outBuf.String(), "Scheduled: "+path+" (2026-04-15T08:00:00Z)") {
+			t.Errorf("expected 'Scheduled:' in output, got %q", outBuf.String())
+		}
 	})
 
-	t.Run("unschedule command clears scheduledAt via CLI", func(t *testing.T) {
+	t.Run("schedule --clear clears scheduledAt via CLI", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "article.md")
 		if err := os.WriteFile(path, []byte("---\ntitle: CLI Test\ndate: 2026-01-01T00:00:00Z\ndraft: true\nscheduledAt: 2026-04-15T08:00:00Z\n---\nbody\n"), 0o644); err != nil {
@@ -168,7 +202,7 @@ func TestScheduleCmd_Integration(t *testing.T) {
 		var outBuf bytes.Buffer
 		root.SetOut(&outBuf)
 		root.SetErr(&bytes.Buffer{})
-		root.SetArgs([]string{"unschedule", path})
+		root.SetArgs([]string{"schedule", "--clear", path})
 
 		if err := root.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -176,10 +210,43 @@ func TestScheduleCmd_Integration(t *testing.T) {
 
 		a, err := article.Read(path)
 		if err != nil {
-			t.Fatalf("read after CLI unschedule: %v", err)
+			t.Fatalf("read after CLI schedule --clear: %v", err)
 		}
 		if a.Frontmatter.ScheduledAt != nil {
 			t.Errorf("expected scheduledAt to be nil, got %v", a.Frontmatter.ScheduledAt)
+		}
+		if !strings.Contains(outBuf.String(), "Unscheduled: "+path) {
+			t.Errorf("expected 'Unscheduled:' in output, got %q", outBuf.String())
+		}
+	})
+
+	t.Run("clear with datetime argument is an error", func(t *testing.T) {
+		root := NewRootCmd()
+		root.SetOut(&bytes.Buffer{})
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs([]string{"schedule", "--clear", "article.md", "2026-04-15T08:00:00Z"})
+
+		err := root.Execute()
+		if err == nil {
+			t.Fatal("expected error for --clear with <datetime>")
+		}
+		if !strings.Contains(err.Error(), "--clear cannot be used with a <datetime> argument") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("missing datetime without clear is an error", func(t *testing.T) {
+		root := NewRootCmd()
+		root.SetOut(&bytes.Buffer{})
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs([]string{"schedule", "article.md"})
+
+		err := root.Execute()
+		if err == nil {
+			t.Fatal("expected error for missing <datetime>")
+		}
+		if !strings.Contains(err.Error(), "<datetime> is required unless --clear is given") {
+			t.Errorf("unexpected error message: %v", err)
 		}
 	})
 }
