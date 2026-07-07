@@ -6,14 +6,15 @@ import (
 	"encoding/xml"
 	"fmt"
 	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 )
 
 type fotolifeEntry struct {
-	XMLName  xml.Name        `xml:"http://purl.org/atom/ns# entry"`
-	Title    string          `xml:"title"`
-	Content  fotolifeContent `xml:"content"`
+	XMLName xml.Name        `xml:"http://purl.org/atom/ns# entry"`
+	Title   string          `xml:"title"`
+	Content fotolifeContent `xml:"content"`
 }
 
 type fotolifeContent struct {
@@ -61,15 +62,8 @@ func (c *Client) UploadImage(ctx context.Context, filePath string) (string, erro
 		return "", fmt.Errorf("marshal fotolife entry: %w", err)
 	}
 
-	resp, err := c.do(ctx, "POST", c.fotolifeURL, body)
+	rawBody, _, err := c.request(ctx, http.MethodPost, c.fotolifeURL, body)
 	if err != nil {
-		return "", err
-	}
-	rawBody, err := readBody(resp)
-	if err != nil {
-		return "", err
-	}
-	if err := checkStatus(resp, rawBody); err != nil {
 		return "", err
 	}
 

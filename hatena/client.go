@@ -3,11 +3,19 @@ package hatena
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
+)
+
+var (
+	// ErrUnauthorized is returned when the API rejects the request with 401.
+	ErrUnauthorized = errors.New("authentication failed (401)")
+	// ErrNotFound is returned when the API responds with 404.
+	ErrNotFound = errors.New("entry not found (404)")
 )
 
 // Client is a Hatena Blog AtomPub API client.
@@ -96,12 +104,26 @@ func (c *Client) do(ctx context.Context, method, url string, body []byte) (*http
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
 		return nil, fmt.Errorf("http %s %s: %w", method, url, err)
 	}
 	return resp, nil
+}
+
+// request performs an authenticated request and returns the response body
+// and status code after rejecting non-success statuses.
+func (c *Client) request(ctx context.Context, method, url string, body []byte) (data []byte, statusCode int, err error) {
+	resp, err := c.do(ctx, method, url, body)
+	if err != nil {
+		return nil, 0, err
+	}
+	data, err = readBody(resp)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := checkStatus(resp, data); err != nil {
+		return nil, resp.StatusCode, err
+	}
+	return data, resp.StatusCode, nil
 }
 
 func readBody(resp *http.Response) ([]byte, error) {
@@ -118,9 +140,9 @@ func checkStatus(resp *http.Response, data []byte) error {
 	case http.StatusOK, http.StatusCreated, http.StatusNoContent: // NoContent is used by DeleteEntry
 		return nil
 	case http.StatusUnauthorized:
-		return fmt.Errorf("authentication failed (401)")
+		return ErrUnauthorized
 	case http.StatusNotFound:
-		return fmt.Errorf("entry not found (404)")
+		return ErrNotFound
 	default:
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, data)
 	}
@@ -132,15 +154,8 @@ func (c *Client) ListEntries(ctx context.Context, maxPages int) ([]*Entry, error
 	url := c.collectionURL()
 	var all []*Entry
 	for page := 1; url != ""; page++ {
-		resp, err := c.do(ctx, http.MethodGet, url, nil)
+		data, _, err := c.request(ctx, http.MethodGet, url, nil)
 		if err != nil {
-			return nil, err
-		}
-		data, err := readBody(resp)
-		if err != nil {
-			return nil, err
-		}
-		if err := checkStatus(resp, data); err != nil {
 			return nil, err
 		}
 		entries, nextURL, err := parseFeed(data)
@@ -161,15 +176,8 @@ func (c *Client) GetEntry(ctx context.Context, editURL string) (*Entry, error) {
 	if err := c.validateEditURL(editURL); err != nil {
 		return nil, err
 	}
-	resp, err := c.do(ctx, http.MethodGet, editURL, nil)
+	data, _, err := c.request(ctx, http.MethodGet, editURL, nil)
 	if err != nil {
-		return nil, err
-	}
-	data, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkStatus(resp, data); err != nil {
 		return nil, err
 	}
 	return parseEntry(data)
@@ -181,15 +189,8 @@ func (c *Client) CreateEntry(ctx context.Context, e *Entry) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.do(ctx, http.MethodPost, c.collectionURL(), body)
+	data, _, err := c.request(ctx, http.MethodPost, c.collectionURL(), body)
 	if err != nil {
-		return nil, err
-	}
-	data, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkStatus(resp, data); err != nil {
 		return nil, err
 	}
 	return parseEntry(data)
@@ -204,20 +205,13 @@ func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*En
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.do(ctx, http.MethodPut, editURL, body)
+	data, statusCode, err := c.request(ctx, http.MethodPut, editURL, body)
 	if err != nil {
 		return nil, err
 	}
-	data, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode == http.StatusNoContent {
+	if statusCode == http.StatusNoContent {
 		// Server accepted the update but returned no body; use the sent entry.
 		return e, nil
-	}
-	if err := checkStatus(resp, data); err != nil {
-		return nil, err
 	}
 	return parseEntry(data)
 }
@@ -227,13 +221,6 @@ func (c *Client) DeleteEntry(ctx context.Context, editURL string) error {
 	if err := c.validateEditURL(editURL); err != nil {
 		return err
 	}
-	resp, err := c.do(ctx, http.MethodDelete, editURL, nil)
-	if err != nil {
-		return err
-	}
-	data, err := readBody(resp)
-	if err != nil {
-		return err
-	}
-	return checkStatus(resp, data)
+	_, _, err := c.request(ctx, http.MethodDelete, editURL, nil)
+	return err
 }

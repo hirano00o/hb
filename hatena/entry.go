@@ -104,12 +104,11 @@ func entryFromXML(x *xmlEntry) *Entry {
 		Content:   x.Content.Body,
 		CustomURL: x.CustomURL,
 	}
+	updated, updatedErr := time.Parse(time.RFC3339, x.Updated)
 	if x.Control != nil && x.Control.Draft == "yes" {
 		e.Draft = true
-		if x.Control.Scheduled == "yes" {
-			if t, err := time.Parse(time.RFC3339, x.Updated); err == nil {
-				e.ScheduledAt = t
-			}
+		if x.Control.Scheduled == "yes" && updatedErr == nil {
+			e.ScheduledAt = updated
 		}
 	}
 	for _, l := range x.Links {
@@ -126,8 +125,8 @@ func entryFromXML(x *xmlEntry) *Entry {
 	if t, err := time.Parse(time.RFC3339, x.Published); err == nil {
 		e.Date = t
 	}
-	if t, err := time.Parse(time.RFC3339, x.Updated); err == nil {
-		e.Updated = t
+	if updatedErr == nil {
+		e.Updated = updated
 	}
 	return e
 }

@@ -137,37 +137,45 @@ func LoadMerged() (*Config, error) {
 		merged = Merge(global, project)
 	}
 
+	if err := applyEnvOverrides(merged); err != nil {
+		return nil, err
+	}
+	return merged, nil
+}
+
+// applyEnvOverrides overwrites cfg fields from HB_* environment variables.
+func applyEnvOverrides(cfg *Config) error {
 	if v := os.Getenv("HB_HATENA_ID"); v != "" {
-		merged.HatenaID = v
+		cfg.HatenaID = v
 	}
 	if v := os.Getenv("HB_BLOG_ID"); v != "" {
-		merged.BlogID = v
+		cfg.BlogID = v
 	}
 	if v := os.Getenv("HB_API_KEY"); v != "" {
-		merged.APIKey = v
+		cfg.APIKey = v
 	}
 	if v := os.Getenv("HB_CONCURRENCY"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("HB_CONCURRENCY must be a positive integer, got %q", v)
+			return fmt.Errorf("HB_CONCURRENCY must be a positive integer, got %q", v)
 		}
-		merged.Concurrency = &n
+		cfg.Concurrency = &n
 	}
 	if v := os.Getenv("HB_MAX_PAGES"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
-			return nil, fmt.Errorf("HB_MAX_PAGES must be a non-negative integer, got %q", v)
+			return fmt.Errorf("HB_MAX_PAGES must be a non-negative integer, got %q", v)
 		}
-		merged.MaxPages = &n
+		cfg.MaxPages = &n
 	}
 	if v := os.Getenv("HB_TIMEOUT_SEC"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("HB_TIMEOUT_SEC must be a positive integer, got %q", v)
+			return fmt.Errorf("HB_TIMEOUT_SEC must be a positive integer, got %q", v)
 		}
-		merged.TimeoutSec = &n
+		cfg.TimeoutSec = &n
 	}
-	return merged, nil
+	return nil
 }
 
 // Validate returns an error if any required field is empty or a numeric field

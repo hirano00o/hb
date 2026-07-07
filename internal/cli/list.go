@@ -52,33 +52,13 @@ func runList(cmd *cobra.Command, dir string, draftOnly, publishedOnly bool, show
 		return fmt.Errorf("--scheduled cannot be used with --draft or --published")
 	}
 
-	files, err := globMD(dir)
+	locals, err := loadArticles(dir, showWarnings, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
-
-	var articles []*article.Article
-	var readErrCount int
-	for _, f := range files {
-		a, err := article.Read(f)
-		if err != nil {
-			readErrCount++
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
-			}
-			continue
-		}
-		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
-			}
-			continue
-		}
-		articles = append(articles, a)
-	}
-
-	if readErrCount > 0 && !showWarnings {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
+	articles := make([]*article.Article, 0, len(locals))
+	for _, l := range locals {
+		articles = append(articles, l.art)
 	}
 
 	if listCategories {

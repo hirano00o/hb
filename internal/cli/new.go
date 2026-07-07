@@ -77,30 +77,23 @@ func newNewCmdIn(dir string) *cobra.Command {
 
 			// --push: POST to the API (same flow as push.go CreateEntry path).
 			ctx := cmd.Context()
-			client, err := newClientFromConfig()
+			client, _, err := newClientFromConfig()
 			if err != nil {
 				return err
 			}
 
-			pushBody, err := article.ReplaceLocalImages(ctx, a.Body, filepath.Dir(path), client.UploadImage)
+			// preparePushEntry already prefixes "replace images: ", so wrapping
+			// with only the retry hint keeps the original message byte-identical.
+			pushEntry, _, err := preparePushEntry(ctx, client, a, path)
 			if err != nil {
-				return fmt.Errorf("replace images: %w (local file saved at %s; retry with: hb push %s)", err, path, path)
+				return fmt.Errorf("%w (local file saved at %s; retry with: hb push %s)", err, path, path)
 			}
-			pushEntry := a.ToEntry()
-			pushEntry.Content = pushBody
 
 			created, err := client.CreateEntry(ctx, pushEntry)
 			if err != nil {
 				return fmt.Errorf("%w (local file saved at %s; retry with: hb push %s)", err, path, path)
 			}
-			a.Frontmatter.EditURL = created.EditURL
-			a.Frontmatter.URL = created.URL
-			a.Frontmatter.Date = created.Date
-			if err := article.Write(path, a); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Created: %s\n", created.URL)
-			return nil
+			return writeBackAndReport(cmd, path, a, created, "Created")
 		},
 	}
 

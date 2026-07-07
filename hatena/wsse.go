@@ -16,11 +16,11 @@ func GenerateWSSEHeader(username, apiKey string) (string, error) {
 	if _, err := rand.Read(nonce); err != nil {
 		return "", fmt.Errorf("generate nonce: %w", err)
 	}
-	return generateWSSE(username, apiKey, nonce, time.Now().UTC())
+	return generateWSSE(username, apiKey, nonce, time.Now().UTC()), nil
 }
 
 // generateWSSE is the testable core: accepts explicit nonce and created time.
-func generateWSSE(username, apiKey string, nonce []byte, created time.Time) (string, error) {
+func generateWSSE(username, apiKey string, nonce []byte, created time.Time) string {
 	createdStr := created.Format(time.RFC3339)
 	nonceB64 := base64.StdEncoding.EncodeToString(nonce)
 
@@ -33,5 +33,5 @@ func generateWSSE(username, apiKey string, nonce []byte, created time.Time) (str
 	return fmt.Sprintf(
 		`UsernameToken Username="%s", PasswordDigest="%s", Nonce="%s", Created="%s"`,
 		username, digest, nonceB64, createdStr,
-	), nil
+	)
 }

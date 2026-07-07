@@ -138,19 +138,14 @@ func pushAfterStateChange(cmd *cobra.Command, path string) error {
 		return fmt.Errorf("read %s: %w", path, err)
 	}
 
-	client, err := newClientFromConfig()
+	client, _, err := newClientFromConfig()
 	if err != nil {
 		return err
 	}
 
-	pushBody, err := article.ReplaceLocalImages(ctx, local.Body, filepath.Dir(path), client.UploadImage)
+	pushEntry, _, err := preparePushEntry(ctx, client, local, path)
 	if err != nil {
-		return fmt.Errorf("replace images: %w", err)
-	}
-	pushEntry := local.ToEntry()
-	pushEntry.Content = pushBody
-	if local.Frontmatter.ScheduledAt != nil {
-		pushEntry.Draft = true
+		return err
 	}
 
 	if local.Frontmatter.EditURL == "" {
@@ -158,26 +153,12 @@ func pushAfterStateChange(cmd *cobra.Command, path string) error {
 		if err != nil {
 			return err
 		}
-		local.Frontmatter.EditURL = created.EditURL
-		local.Frontmatter.URL = created.URL
-		local.Frontmatter.Date = created.Date
-		if err := article.Write(path, local); err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Created: %s\n", created.URL)
-		return nil
+		return writeBackAndReport(cmd, path, local, created, "Created")
 	}
 
 	updated, err := client.UpdateEntry(ctx, local.Frontmatter.EditURL, pushEntry)
 	if err != nil {
 		return err
 	}
-	local.Frontmatter.EditURL = updated.EditURL
-	local.Frontmatter.URL = updated.URL
-	local.Frontmatter.Date = updated.Date
-	if err := article.Write(path, local); err != nil {
-		return err
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Updated: %s\n", updated.URL)
-	return nil
+	return writeBackAndReport(cmd, path, local, updated, "Updated")
 }

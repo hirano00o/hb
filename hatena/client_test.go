@@ -2,6 +2,7 @@ package hatena
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -129,6 +130,18 @@ func TestGetEntry_NotFound(t *testing.T) {
 	_, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/999")
 	if err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("expected 404 error, got %v", err)
+	}
+}
+
+func TestGetEntry_NotFound_SentinelError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/999", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	c := newTestClient(t, mux)
+	_, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/999")
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected errors.Is(err, ErrNotFound), got %v", err)
 	}
 }
 

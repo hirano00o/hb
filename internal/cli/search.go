@@ -31,7 +31,7 @@ func newSearchCmd() *cobra.Command {
 }
 
 func runSearch(cmd *cobra.Command, query, dir string, titleOnly, bodyOnly bool, showWarnings bool) error {
-	files, err := globMD(dir)
+	locals, err := loadArticles(dir, showWarnings, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
@@ -39,22 +39,8 @@ func runSearch(cmd *cobra.Command, query, dir string, titleOnly, bodyOnly bool, 
 	q := strings.ToLower(query)
 
 	var matched []*article.Article
-	var readErrCount int
-	for _, f := range files {
-		a, err := article.Read(f)
-		if err != nil {
-			readErrCount++
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to read %s: %v (skipping)\n", f, err)
-			}
-			continue
-		}
-		if a.Frontmatter.Title == "" && a.Frontmatter.Date.IsZero() {
-			if showWarnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: skipping %s: no frontmatter\n", f)
-			}
-			continue
-		}
+	for _, l := range locals {
+		a := l.art
 		inTitle := strings.Contains(strings.ToLower(a.Frontmatter.Title), q)
 		inBody := strings.Contains(strings.ToLower(a.Body), q)
 		var hit bool
@@ -71,10 +57,6 @@ func runSearch(cmd *cobra.Command, query, dir string, titleOnly, bodyOnly bool, 
 		if hit {
 			matched = append(matched, a)
 		}
-	}
-
-	if readErrCount > 0 && !showWarnings {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %d file(s) skipped due to read errors (use --verbose for details)\n", readErrCount)
 	}
 
 	if len(matched) == 0 {
