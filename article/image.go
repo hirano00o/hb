@@ -40,6 +40,10 @@ func ReplaceLocalImages(ctx context.Context, body, baseDir string, uploader Imag
 	if err != nil {
 		return "", fmt.Errorf("resolve baseDir %s: %w", baseDir, err)
 	}
+	resolvedBase, err := filepath.EvalSymlinks(absBase)
+	if err != nil {
+		return "", fmt.Errorf("resolve baseDir %s: %w", baseDir, err)
+	}
 
 	var rerr error
 	result := imageRegexp.ReplaceAllStringFunc(body, func(match string) string {
@@ -65,6 +69,17 @@ func ReplaceLocalImages(ctx context.Context, body, baseDir string, uploader Imag
 			return match
 		}
 		if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) {
+			rerr = fmt.Errorf("image path %s is outside article directory", path)
+			return match
+		}
+		// Re-check after resolving symlinks: a link inside baseDir may point
+		// outside it, which the lexical prefix check above cannot detect.
+		resolvedPath, aerr := filepath.EvalSymlinks(absPath)
+		if aerr != nil {
+			rerr = fmt.Errorf("resolve image path %s: %w", path, aerr)
+			return match
+		}
+		if !strings.HasPrefix(resolvedPath, resolvedBase+string(filepath.Separator)) {
 			rerr = fmt.Errorf("image path %s is outside article directory", path)
 			return match
 		}

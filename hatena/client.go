@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -27,7 +28,17 @@ func NewClient(hatenaID, blogID, apiKey string, timeoutSecond int) *Client {
 		apiKey:      apiKey,
 		baseURL:     "https://blog.hatena.ne.jp",
 		fotolifeURL: "https://f.hatena.ne.jp/atom/post",
-		http:        &http.Client{Timeout: time.Duration(timeoutSecond) * time.Second},
+		http: &http.Client{
+			Timeout: time.Duration(timeoutSecond) * time.Second,
+			// X-WSSE is not among the headers net/http strips on cross-host
+			// redirects, so following one would leak the credential digest.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if req.URL.Host != via[0].URL.Host {
+					return fmt.Errorf("refusing cross-host redirect to %s", req.URL.Host)
+				}
+				return nil
+			},
+		},
 	}
 }
 
@@ -43,6 +54,24 @@ func (c *Client) SetFotolifeURL(url string) {
 
 func (c *Client) collectionURL() string {
 	return fmt.Sprintf("%s/%s/%s/atom/entry", c.baseURL, c.hatenaID, c.blogID)
+}
+
+// validateEditURL rejects edit URLs whose scheme or host differ from the base URL.
+// Edit URLs come from local frontmatter, which must not be able to direct
+// WSSE-authenticated requests at arbitrary hosts.
+func (c *Client) validateEditURL(editURL string) error {
+	base, err := url.Parse(c.baseURL)
+	if err != nil {
+		return fmt.Errorf("parse base URL %s: %w", c.baseURL, err)
+	}
+	u, err := url.Parse(editURL)
+	if err != nil {
+		return fmt.Errorf("parse edit URL %s: %w", editURL, err)
+	}
+	if u.Scheme != base.Scheme || u.Host != base.Host {
+		return fmt.Errorf("edit URL %s does not match API host %s", editURL, base.Host)
+	}
+	return nil
 }
 
 func (c *Client) do(ctx context.Context, method, url string, body []byte) (*http.Response, error) {
@@ -129,6 +158,9 @@ func (c *Client) ListEntries(ctx context.Context, maxPages int) ([]*Entry, error
 
 // GetEntry fetches a single entry by its edit URL.
 func (c *Client) GetEntry(ctx context.Context, editURL string) (*Entry, error) {
+	if err := c.validateEditURL(editURL); err != nil {
+		return nil, err
+	}
 	resp, err := c.do(ctx, http.MethodGet, editURL, nil)
 	if err != nil {
 		return nil, err
@@ -165,6 +197,9 @@ func (c *Client) CreateEntry(ctx context.Context, e *Entry) (*Entry, error) {
 
 // UpdateEntry updates an existing entry via PUT to its edit URL.
 func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*Entry, error) {
+	if err := c.validateEditURL(editURL); err != nil {
+		return nil, err
+	}
 	body, err := marshalEntry(e)
 	if err != nil {
 		return nil, err
@@ -189,6 +224,9 @@ func (c *Client) UpdateEntry(ctx context.Context, editURL string, e *Entry) (*En
 
 // DeleteEntry deletes the remote entry identified by editURL.
 func (c *Client) DeleteEntry(ctx context.Context, editURL string) error {
+	if err := c.validateEditURL(editURL); err != nil {
+		return err
+	}
 	resp, err := c.do(ctx, http.MethodDelete, editURL, nil)
 	if err != nil {
 		return err

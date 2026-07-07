@@ -188,3 +188,25 @@ func TestReplaceLocalImages_PathTraversalRejected(t *testing.T) {
 		t.Fatal("expected error for path traversal, got nil")
 	}
 }
+
+func TestReplaceLocalImages_SymlinkEscapeRejected(t *testing.T) {
+	outside := t.TempDir()
+	secret := filepath.Join(outside, "secret.jpg")
+	if err := os.WriteFile(secret, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Symlink(secret, filepath.Join(dir, "link.jpg")); err != nil {
+		t.Skipf("symlink not supported on this platform: %v", err)
+	}
+	uploader := func(_ context.Context, _ string) (string, error) {
+		t.Error("uploader must not be called for a symlink escaping baseDir")
+		return "", nil
+	}
+
+	body := "![alt](link.jpg)\n"
+	_, err := ReplaceLocalImages(context.Background(), body, dir, uploader)
+	if err == nil {
+		t.Fatal("expected error for symlink escaping baseDir, got nil")
+	}
+}

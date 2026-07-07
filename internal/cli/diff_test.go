@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/hatena"
 )
 
 // TestDiff_NoEditURL_NewEntry verifies that diff prints a message for unpublished entries
@@ -52,9 +53,9 @@ func TestDiff_NoDifferences(t *testing.T) {
 	t.Cleanup(srv.Close)
 	srvURL = srv.URL
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srvURL)
+	stubClient(t, c)
 
 	editURL := srvURL + "/user/example.hateblo.jp/atom/entry/" + entryID
 	fm := article.Frontmatter{
@@ -93,9 +94,9 @@ func TestDiff_LocalImageNote(t *testing.T) {
 	t.Cleanup(srv.Close)
 	srvURL = srv.URL
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srvURL)
+	stubClient(t, c)
 
 	editURL := srvURL + "/user/example.hateblo.jp/atom/entry/" + entryID
 	fm := article.Frontmatter{
@@ -131,9 +132,9 @@ func TestDiff_WithDifferences(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/11"
 	fm := article.Frontmatter{
@@ -205,9 +206,9 @@ func TestDiff_MultipleFiles_AllProcessed(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	var paths []string
 	for _, id := range []string{"40", "41"} {
@@ -248,9 +249,9 @@ func TestDiff_All_SkipsNoEditURL(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	dir := t.TempDir()
 	origDir, err := os.Getwd()

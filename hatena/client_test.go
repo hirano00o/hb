@@ -255,6 +255,68 @@ func TestUpdateEntry_Unauthorized(t *testing.T) {
 	}
 }
 
+func TestEditURLMethods_RejectForeignHost(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request must reach the server, got %s %s", r.Method, r.URL)
+	})
+	c := newTestClient(t, mux)
+	foreign := "https://attacker.example.com/user/example.hateblo.jp/atom/entry/1"
+
+	t.Run("GetEntry", func(t *testing.T) {
+		_, err := c.GetEntry(context.Background(), foreign)
+		if err == nil || !strings.Contains(err.Error(), "does not match API host") {
+			t.Errorf("expected host mismatch error, got %v", err)
+		}
+	})
+	t.Run("UpdateEntry", func(t *testing.T) {
+		_, err := c.UpdateEntry(context.Background(), foreign, &Entry{Title: "x", Content: "y"})
+		if err == nil || !strings.Contains(err.Error(), "does not match API host") {
+			t.Errorf("expected host mismatch error, got %v", err)
+		}
+	})
+	t.Run("DeleteEntry", func(t *testing.T) {
+		err := c.DeleteEntry(context.Background(), foreign)
+		if err == nil || !strings.Contains(err.Error(), "does not match API host") {
+			t.Errorf("expected host mismatch error, got %v", err)
+		}
+	})
+}
+
+func TestGetEntry_RejectsCrossHostRedirect(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/1", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://attacker.example.com/steal", http.StatusFound)
+	})
+	c := newTestClient(t, mux)
+	_, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/1")
+	if err == nil || !strings.Contains(err.Error(), "cross-host redirect") {
+		t.Errorf("expected cross-host redirect error, got %v", err)
+	}
+}
+
+func TestGetEntry_FollowsSameHostRedirect(t *testing.T) {
+	data, err := os.ReadFile("testdata/entry_single.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/old", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/user/example.hateblo.jp/atom/entry/new", http.StatusFound)
+	})
+	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/new", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(data)
+	})
+	c := newTestClient(t, mux)
+	entry, err := c.GetEntry(context.Background(), c.baseURL+"/user/example.hateblo.jp/atom/entry/old")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry.Title != "Test Entry Title" {
+		t.Errorf("title: got %q", entry.Title)
+	}
+}
+
 func TestGetEntry_ContextCancel(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/user/example.hateblo.jp/atom/entry/1", func(w http.ResponseWriter, r *http.Request) {

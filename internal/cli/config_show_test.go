@@ -26,6 +26,9 @@ func TestMaskAPIKey(t *testing.T) {
 }
 
 func TestConfigShow(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+
 	t.Setenv("HB_HATENA_ID", "myuser")
 	t.Setenv("HB_BLOG_ID", "myuser.hateblo.jp")
 	t.Setenv("HB_API_KEY", "secretkey1234")

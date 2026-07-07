@@ -71,7 +71,7 @@ hb config init
 | `HB_API_KEY` | API キー |
 | `HB_CONCURRENCY` | pull の並列実行数（デフォルト: 5） |
 | `HB_MAX_PAGES` | pull のページ取得上限（デフォルト: 0 = 無制限） |
-| `HB_TIMEOUT_SEC` | タイムアウト秒数（デフォルト: 30） |
+| `HB_TIMEOUT_SEC` | タイムアウト秒数（正の整数、デフォルト: 30） |
 
 ### 設定ファイルの優先度
 
@@ -85,7 +85,7 @@ blog_id: yourblog.hateblo.jp
 api_key: your_api_key
 concurrency: 10  # pull の並列実行数（デフォルト: 5）
 max_pages: 5     # pull のページ取得上限（デフォルト: 0 = 無制限）
-timeout_sec: 30  # タイムアウト秒数（デフォルト: 30）
+timeout_sec: 30  # タイムアウト秒数（正の整数、デフォルト: 30）
 ```
 
 ### `hb config init`

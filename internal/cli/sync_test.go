@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hirano00o/hb/article"
+	"github.com/hirano00o/hb/hatena"
 )
 
 // TestSync_NoEditURL verifies that sync returns an error when the file has no editUrl.
@@ -52,9 +53,9 @@ func TestSync_NoDifferences(t *testing.T) {
 	t.Cleanup(srv.Close)
 	srvURL = srv.URL
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srvURL)
+	stubClient(t, c)
 
 	editURL := srvURL + "/user/example.hateblo.jp/atom/entry/" + entryID
 	fm := article.Frontmatter{
@@ -90,9 +91,9 @@ func TestSync_WithDifferences_Confirm(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/21"
 	fm := article.Frontmatter{
@@ -182,9 +183,9 @@ func TestSync_WithDifferences_Abort(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/22"
 	fm := article.Frontmatter{
@@ -231,9 +232,9 @@ func TestSync_WithDifferences_YesFlag(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	editURL := srv.URL + "/user/example.hateblo.jp/atom/entry/23"
 	fm := article.Frontmatter{
@@ -320,9 +321,9 @@ func TestSync_MultipleFiles_AllProcessed(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	var paths []string
 	for _, id := range []string{"30", "31"} {
@@ -367,9 +368,9 @@ func TestSync_All_SkipsNoEditURL(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	t.Setenv("HB_HATENA_ID", "user")
-	t.Setenv("HB_BLOG_ID", "example.hateblo.jp")
-	t.Setenv("HB_API_KEY", "key")
+	c := hatena.NewClient("user", "example.hateblo.jp", "key", 30)
+	c.SetBaseURL(srv.URL)
+	stubClient(t, c)
 
 	dir := t.TempDir()
 	origDir, err := os.Getwd()
