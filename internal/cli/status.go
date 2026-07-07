@@ -91,6 +91,11 @@ func runStatus(cmd *cobra.Command, client *hatena.Client, dir string, maxPages i
 	if err != nil {
 		return err
 	}
+	if maxPages > 0 {
+		// Entries beyond the page limit are invisible here, so tracked
+		// articles may be misreported as Untracked.
+		fmt.Fprintf(cmd.ErrOrStderr(), "note: remote listing limited to %d page(s) by max_pages; Untracked results may be incomplete\n", maxPages)
+	}
 	remoteByEditURL := make(map[string]*article.Article, len(remoteEntries))
 	for _, e := range remoteEntries {
 		if e.EditURL != "" {

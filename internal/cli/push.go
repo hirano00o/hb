@@ -176,10 +176,20 @@ func pushOne(ctx context.Context, cmd *cobra.Command, client *hatena.Client, pat
 // hasChanges returns true if the local article differs from the remote in any field.
 func hasChanges(local, remote *article.Article) bool {
 	lf, rf := local.Frontmatter, remote.Frontmatter
+	// A scheduled entry is stored as draft=yes on the API side regardless of
+	// the local draft field (see pushOne), so compare draft under the same
+	// normalization; otherwise a scheduled post reports a permanent diff.
+	lDraft, rDraft := lf.Draft, rf.Draft
+	if lf.ScheduledAt != nil {
+		lDraft = true
+	}
+	if rf.ScheduledAt != nil {
+		rDraft = true
+	}
 	return local.Body != remote.Body ||
 		!lf.Date.Equal(rf.Date) ||
 		lf.Title != rf.Title ||
-		lf.Draft != rf.Draft ||
+		lDraft != rDraft ||
 		!slices.Equal(lf.Category, rf.Category) ||
 		lf.CustomURLPath != rf.CustomURLPath ||
 		!scheduledAtEqual(lf.ScheduledAt, rf.ScheduledAt)

@@ -699,10 +699,10 @@ func TestPush_HasChanges(t *testing.T) {
 			want:   true,
 		},
 		{
-			name:  "scheduledAt: both nil",
-			local: base,
+			name:   "scheduledAt: both nil",
+			local:  base,
 			remote: base,
-			want:  false,
+			want:   false,
 		},
 		{
 			name: "scheduledAt: same value",
@@ -731,6 +731,23 @@ func TestPush_HasChanges(t *testing.T) {
 				return a
 			}(),
 			want: true,
+		},
+		{
+			// The API stores scheduled entries as draft=yes, so a local
+			// scheduled article with draft=false must not report a diff.
+			name: "scheduledAt: remote draft=true is normalized",
+			local: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &scheduledAt
+				return a
+			}(),
+			remote: func() article.Article {
+				a := base
+				a.Frontmatter.ScheduledAt = &scheduledAt
+				a.Frontmatter.Draft = true
+				return a
+			}(),
+			want: false,
 		},
 	}
 

@@ -109,6 +109,38 @@ func TestWatch_FileChange_TriggersPush(t *testing.T) {
 }
 
 // TestWatch_Debounce verifies that rapid successive saves result in only one push.
+// TestPushFile_SkipsFileWithoutEditURL verifies that auto-push never creates
+// new entries: files without an editUrl are skipped with a notice.
+func TestPushFile_SkipsFileWithoutEditURL(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "new.md")
+	a := &article.Article{
+		Frontmatter: article.Frontmatter{
+			Title: "New Post",
+			Date:  time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		},
+		Body: "body\n",
+	}
+	if err := article.Write(p, a); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{Use: "watch"}
+	var out, errOut bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+
+	if err := pushFile(cmd, p); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(errOut.String(), "no editUrl") {
+		t.Errorf("expected skip notice on stderr, got: %q", errOut.String())
+	}
+	if strings.Contains(out.String(), "pushing") {
+		t.Errorf("expected no push attempt, got: %q", out.String())
+	}
+}
+
 func TestWatch_Debounce(t *testing.T) {
 	dir := t.TempDir()
 	fm := article.Frontmatter{

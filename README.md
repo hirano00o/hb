@@ -177,7 +177,7 @@ hb push 20260301_my-article.md
 
 ### `hb publish`
 
-指定した記事を公開状態にします。`draft` を `false` に設定し、ファイル名の `draft_` プレフィックスを除去します。
+指定した記事を公開状態にします。`draft` を `false` に設定し、ファイル名の `draft_` プレフィックスを除去します。`scheduledAt` が設定されている場合はクリアします（予約時刻ではなく即時公開の意図とみなします）。
 
 ```sh
 hb publish <file> [--push|-p]
@@ -187,7 +187,7 @@ hb publish <file> [--push|-p]
 
 ### `hb unpublish`
 
-指定した記事を下書き状態に戻します。`draft` を `true` に設定し、ファイル名に `draft_` プレフィックスを付与します。
+指定した記事を下書き状態に戻します。`draft` を `true` に設定し、ファイル名に `draft_` プレフィックスを付与します。`scheduledAt` が設定されている場合はクリアします（残したままだと次回 push で予約投稿として再登録されるため）。
 
 ```sh
 hb unpublish <file> [--push|-p]
@@ -340,6 +340,8 @@ hb status [--dir <directory>]
 - **Untracked**: `editUrl` がない（未公開記事）
 - **Up to date**: ローカルとリモートが一致している
 
+`max_pages` を設定している場合、上限を超えたリモート記事は取得されないため Untracked と誤分類されることがあります。このとき stderr に注記が出力されます。
+
 > **注意**: ローカル画像参照（`![alt](photo.jpg)` のように `http`/`https` で始まらないパス）を含む記事は、`hb push` でアップロードが完了するまで **Modified** と表示される場合があります。このとき stderr に `note: <file> contains local images; ...` が出力されます。
 
 ```
@@ -381,6 +383,8 @@ hb watch [<file>] [--dir <directory>] [--debounce <duration>]
 - `--debounce`: 変更検知から push までの遅延時間（デフォルト: 500ms）
 
 `<file>` と `--dir` は同時に指定できません。
+
+自動 push の対象は `editUrl` を持つ（＝一度 push 済みの）記事のみです。`editUrl` のないファイルは新規公開を防ぐためスキップされ、stderr に通知が出ます。先に `hb push` で一度公開してから watch してください。
 
 ## フロントマター仕様
 

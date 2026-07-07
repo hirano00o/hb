@@ -7,10 +7,12 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/hirano00o/hb/article"
 	"github.com/spf13/cobra"
 )
 
@@ -98,9 +100,13 @@ func runWatch(ctx context.Context, cmd *cobra.Command, paths []string, debounce 
 	// Propagate the context so pushFile can pass it to subcommands.
 	cmd.SetContext(ctx)
 
-	// Debounce timers keyed by file path.
+	// Debounce timers keyed by file path. The mutex guards the map because
+	// fired timers remove their own entry from the AfterFunc goroutine.
+	var timersMu sync.Mutex
 	timers := make(map[string]*time.Timer)
 	stopAllTimers := func() {
+		timersMu.Lock()
+		defer timersMu.Unlock()
 		for _, t := range timers {
 			t.Stop()
 		}
@@ -134,10 +140,14 @@ func runWatch(ctx context.Context, cmd *cobra.Command, paths []string, debounce 
 			}
 
 			// Debounce: reset the timer for this file.
+			timersMu.Lock()
 			if t, exists := timers[abs]; exists {
 				t.Stop()
 			}
 			timers[abs] = time.AfterFunc(debounce, func() {
+				timersMu.Lock()
+				delete(timers, abs)
+				timersMu.Unlock()
 				if ctx.Err() != nil {
 					return
 				}
@@ -145,6 +155,7 @@ func runWatch(ctx context.Context, cmd *cobra.Command, paths []string, debounce 
 					fmt.Fprintf(cmd.ErrOrStderr(), "push %s: %v\n", abs, err)
 				}
 			})
+			timersMu.Unlock()
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -168,9 +179,22 @@ func isUnderWatchedDir(path string, watched map[string]bool) bool {
 
 // pushFile pushes a single .md file to Hatena Blog without a confirmation prompt.
 func pushFile(cmd *cobra.Command, path string) error {
-	// Skip files without frontmatter or editUrl gracefully.
 	if _, err := os.Stat(path); err != nil {
-		return nil // file deleted; ignore
+		if os.IsNotExist(err) {
+			return nil // file deleted between event and debounce; nothing to push
+		}
+		return fmt.Errorf("stat: %w", err)
+	}
+
+	a, err := article.Read(path)
+	if err != nil {
+		return fmt.Errorf("read: %w", err)
+	}
+	// Auto-push only updates tracked entries: creating a new entry publishes
+	// it without any confirmation, which is too destructive for a watcher.
+	if a.Frontmatter.EditURL == "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "[watch] skipping %s: no editUrl (push it manually once; auto-push never creates new entries)\n", path)
+		return nil
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "[watch] pushing %s ...\n", path)
@@ -187,4 +211,3 @@ func pushFile(cmd *cobra.Command, path string) error {
 	}
 	return pushCmd.RunE(pushCmd, []string{path})
 }
-
