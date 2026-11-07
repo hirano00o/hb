@@ -131,11 +131,15 @@ func TestRunStats_CategoryCount(t *testing.T) {
 func TestRunStats_MonthCount(t *testing.T) {
 	dir := t.TempDir()
 
+	now := time.Now().UTC()
+	thisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	lastMonth := thisMonth.AddDate(0, -1, 0)
+	tooOld := thisMonth.AddDate(0, -9, 0)
 	dates := []time.Time{
-		time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC),
-		time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		thisMonth,
+		thisMonth.AddDate(0, 0, 14),
+		lastMonth.AddDate(0, 0, 9),
+		tooOld,
 	}
 	for i, d := range dates {
 		writeStatsMD(t, dir, "art"+string(rune('0'+i))+".md", article.Frontmatter{
@@ -153,15 +157,13 @@ func TestRunStats_MonthCount(t *testing.T) {
 	if !strings.Contains(s, "By month") {
 		t.Errorf("expected 'By month' header, got %q", s)
 	}
-	if !strings.Contains(s, "2026-03:") {
-		t.Errorf("expected 2026-03 in output, got %q", s)
+	for _, m := range []time.Time{thisMonth, lastMonth} {
+		if key := m.Format("2006-01") + ":"; !strings.Contains(s, key) {
+			t.Errorf("expected %s in output, got %q", key, s)
+		}
 	}
-	if !strings.Contains(s, "2026-02:") {
-		t.Errorf("expected 2026-02 in output, got %q", s)
-	}
-	// 2025-06 is older than 6 months from 2026-03, should not appear
-	if strings.Contains(s, "2025-06:") {
-		t.Errorf("expected 2025-06 to be excluded with --months 6, got %q", s)
+	if key := tooOld.Format("2006-01") + ":"; strings.Contains(s, key) {
+		t.Errorf("expected %s to be excluded with --months 6, got %q", key, s)
 	}
 }
 
