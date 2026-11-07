@@ -12,19 +12,19 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        packages.default = pkgs.buildGo125Module {
+        packages.default = pkgs.buildGo127Module {
           pname = "hb";
           version = self.shortRev or "dev";
           src = self;
           subPackages = [ "cmd/hb" ];
-          vendorHash = "sha256-DA4yV/twbODY6ePPijGUAZNEqt4fO7XHdWOJEenMQp4=";
+          vendorHash = "sha256-RvQLb0KCnPszIuQutyjY26j41uYY9XNo73O5KOKA3ms=";
           ldflags = [ "-s" "-w" ];
           env.CGO_ENABLED = "0";
         };
 
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            pkgs.go_1_25
+            pkgs.go_1_27
             pkgs.gopls
             pkgs.golangci-lint
           ];
